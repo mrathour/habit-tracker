@@ -91,8 +91,8 @@ Broken cases in Work Log (test), last checked 2026-10-17:
 | Missing start time | Yes: ID 7 |
 | Date without a time | Yes: ID 5 (Start Time is a date only) |
 | Blank name | Yes: ID 8 (must **not** be flagged) |
-| Minutes mismatch | No. ID 7 was the only one, and its start time is now empty, so no mismatch can be measured |
-| End before start | No |
+| Minutes mismatch | No. ID 5 logs 27 min, but its Start Time has no time, so Start → End can't be measured. Needs an entry with both times set |
+| End before start | Yes: ID 4 (13:48 → 13:30) |
 
 pytest fixtures cover every case, plus a schema with no end-time column, whatever the test database contains (see the Decisions log in `PLAN.md`).
 
