@@ -76,7 +76,24 @@ Project install, run, test and build commands are added in Phase 2 (see `CLAUDE.
 
 ## Notion data for testing
 
-Development uses the original **Work Log** database (columns: ID, Name, Start Time, End Time, MinuteSpent, Parent Task). No separate test databases exist. Broken entries and a schema with no end-time column are covered by pytest fixtures (see the Decisions log in `PLAN.md`).
+Both databases have the columns ID, Name, Start Time, End Time, MinuteSpent and Parent Task.
+
+| Database | Use | Link |
+|---|---|---|
+| Work Log | Real data | https://app.notion.com/p/3fc15553ce3d8099b48ecfe39046d671 |
+| Work Log (test) | Manual testing | https://app.notion.com/p/3fc15553ce3d802081ecd3251a0468cd |
+
+Broken cases in Work Log (test), checked 2026-10-17:
+
+| Case | Present |
+|---|---|
+| Minutes mismatch | Yes: ID 7 (logged 148 min, Start → End is 123 min) |
+| Missing end time | Not yet |
+| End before start | Not yet |
+| Date without a time | Not yet |
+| Blank name | Not yet |
+
+pytest fixtures cover every case, plus a schema with no end-time column, whatever the test database contains (see the Decisions log in `PLAN.md`).
 
 ## GitHub repository settings
 
