@@ -76,7 +76,7 @@ Validation is informational only. Every entry is imported, and its issues are st
 
 | Issue | Rule | Effect |
 |---|---|---|
-| Duration mismatch | Logged minutes differs from (End − Start) by more than 1 minute. Checked only when Logged minutes is mapped and has a value. | Shown as a red cell |
+| Duration mismatch | Logged minutes differs from (End − Start) by more than 1 minute. Checked only when Logged minutes is mapped and has a value, and only when Start and End both have times and End is not before Start; otherwise the entry shows only its Missing time or Invalid range issue. | Shown as a red cell |
 | Invalid range | End time is before Start time | Red cells; excluded from charts |
 | Missing time | Start or End is empty, or has a date but no time | Red cells; excluded from charts |
 | Unreadable extra field | An extra field's value cannot be read | Red cell for that field only |
@@ -360,3 +360,4 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-17 | Development tools are installed with Scoop instead of `winget` (for example `scoop install gh extras/inno-setup`). The WebView2 Runtime is the exception, because Scoop doesn't provide it. The 15.1 tool table was updated to match. |
 | 2026-10-17 | No Notion test databases. Development uses the original Work Log. Broken-entry and missing-column cases are tested with pytest fixtures; the Phase 4 and 5 "Done when" checks were updated to match. |
 | 2026-10-17 | Supersedes the previous row: the user created **Work Log (test)** (same schema as the Work Log) for manual testing. Pytest fixtures still cover every broken case and the missing end-time column. There is no separate no-end-time database; the fixture covers that case. |
+| 2026-10-17 | Duration mismatch is checked only when the range is valid (both times present, End not before Start). An entry with a missing time or an invalid range shows only that issue, never a mismatch as well. |
