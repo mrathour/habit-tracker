@@ -195,6 +195,8 @@ I haven't changed anything in the extension.
 
 ## 8. Proposed auth design for the desktop app
 
+**Status:** approved on 2026-10-18 with additions. PLAN.md section 12 is now the authoritative version; this section records the original proposal.
+
 This responds to PLAN.md section 12: support other users' workspaces through OAuth, never embed the client secret, read-only access, tokens in Credential Manager, and logout.
 
 ### 8.1 Options compared
@@ -225,7 +227,7 @@ This responds to PLAN.md section 12: support other users' workspaces through OAu
   - installation scope: **any workspace**. Notion says this **can't be changed after creation**, so it must be right the first time, or other users can't connect later.
   - The portal may ask for website, privacy policy and terms URLs. These can be pages in this repo or on GitHub Pages.
   - This is a separate integration from WebNotes, which needs write access.
-- **Token service:** a small stateless HTTPS service, for example a Cloudflare Worker. Its folder would be `auth-service/` in this repo. It holds the client ID and secret as platform secrets and has four routes:
+- **Token service:** a small stateless HTTPS service, for example a Cloudflare Worker. Its folder would be `service/` in this repo. It holds the client ID and secret as platform secrets and has four routes:
   - `GET /callback`: Notion's registered redirect URI;
   - `POST /refresh`;
   - `POST /revoke`;
@@ -286,10 +288,10 @@ It defaults to `Notion-Version: 2025-09-03`. We will set `notion_version="2026-0
 - **10. Tech stack:**
   - `notion-client` ≥ 3.1 pinned to `Notion-Version: 2026-03-11`;
   - `tzdata` for time zones on Windows;
-  - the `auth-service/` token service (platform to confirm).
+  - the `service/` token service (platform to confirm).
 - **6.4 Mechanics:** rows come from the data-source query endpoint. Retries come from `notion-client`, plus our own request-rate limiter.
 - **11. Local data model:** add `data_source_id` and `workspace_id` / `workspace_name` to `settings`.
-- **14. Project layout:** add `auth-service/`.
+- **14. Project layout:** add `service/`.
 - **15. Phase 3 (Connect):** also build and deploy the token service, create the public integration, and add the internal-token path.
 - **Decisions log:** one row for the auth design and one for the API version.
 
