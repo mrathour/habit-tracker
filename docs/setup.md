@@ -47,7 +47,7 @@ WebView2 check:
 
 4. **Open a new terminal** so the PATH changes take effect, then run every check command in the table above.
 
-5. **Configure Git** (use your GitHub no-reply email if you'd rather not publish your personal address):
+5. **Configure Git** (use your GitHub no-reply email if you'd rather not publish your personal address; this machine uses a personal address by choice):
 
    ```powershell
    git config --global user.name "Your Name"
@@ -74,12 +74,9 @@ WebView2 check:
 
 Project install, run, test and build commands are added in Phase 2 (see `CLAUDE.md` → Commands).
 
-## Notion test databases
+## Notion data for testing
 
-Phases 4 and 5 use two databases in the developer's Notion workspace:
-
-- **Work Log (test)**: a duplicate of the Work Log with deliberately broken entries: a missing end time, an end before its start, a minutes mismatch, a date without a time, and a blank name.
-- **A second small database with no end-time column**, used to test the missing-required-field error.
+Development uses the original **Work Log** database (columns: ID, Name, Start Time, End Time, MinuteSpent, Parent Task). No separate test databases exist. Broken entries and a schema with no end-time column are covered by pytest fixtures (see the Decisions log in `PLAN.md`).
 
 ## GitHub repository settings
 
