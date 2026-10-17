@@ -83,15 +83,16 @@ Both databases have the columns ID, Name, Start Time, End Time, MinuteSpent and 
 | Work Log | Real data | https://app.notion.com/p/3fc15553ce3d8099b48ecfe39046d671 |
 | Work Log (test) | Manual testing | https://app.notion.com/p/3fc15553ce3d802081ecd3251a0468cd |
 
-Broken cases in Work Log (test), checked 2026-10-17:
+Broken cases in Work Log (test), last checked 2026-10-17:
 
 | Case | Present |
 |---|---|
-| Minutes mismatch | Yes: ID 7 (logged 148 min, Start → End is 123 min) |
-| Missing end time | Not yet |
-| End before start | Not yet |
-| Date without a time | Not yet |
-| Blank name | Not yet |
+| Missing end time | Yes: ID 6 |
+| Missing start time | Yes: ID 7 |
+| Date without a time | Yes: ID 5 (Start Time is a date only) |
+| Blank name | Yes: ID 8 (must **not** be flagged) |
+| Minutes mismatch | No. ID 7 was the only one, and its start time is now empty, so no mismatch can be measured |
+| End before start | No |
 
 pytest fixtures cover every case, plus a schema with no end-time column, whatever the test database contains (see the Decisions log in `PLAN.md`).
 
