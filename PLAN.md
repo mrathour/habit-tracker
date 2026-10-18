@@ -205,7 +205,7 @@ Durations always come from End − Start. Entries excluded by validation do not 
 **Errors and logs**
 - **Logs:** rotating files in `%APPDATA%\HabitTracker\logs\` (2 MB × 5), with UTC timestamps. Every handler masks tokens and secrets: Notion token shapes, `Authorization` headers, secret-named keys, OAuth URL parameters, and any value registered at run time.
 - **Unexpected errors** show a readable message with an error ID instead of a crash or a blank window, and are logged. This covers Python calls, background threads, UI code, promises and rendering.
-- **Startup failures** (database, missing UI, dev server) show an error page in the window. A UI that loads but never reports ready is replaced by the error page after a timeout.
+- **Startup failures** (database, missing UI, dev server) show an error page in the window. In normal mode, a UI that loads but never reports ready is replaced by the error page after 15 seconds. Dev mode leaves the page alone, so Vite's error overlay and hot reload keep working.
 - **If the window itself can't open** (for example WebView2 is missing), a Windows message box explains.
 
 **Token service:** a Cloudflare Worker in TypeScript, under `service/`.
