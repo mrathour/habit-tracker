@@ -301,7 +301,7 @@ The user chooses which kind they are pasting:
 | Kind | How the user gets it | Access | Expiry | Notes the app shows |
 |---|---|---|---|---|
 | **Internal integration token** | Creates an internal connection in Notion's developer portal with **Read content** only, then shares the Work Log with it (Add connections) | Only pages shared with the connection | Doesn't expire unless regenerated | The recommended choice for this path, because it can be limited to reading |
-| **Personal access token (PAT)** | Creates one in the developer portal under personal access tokens | Everything the user can access, without sharing | Chosen at creation: 7 days to 1 year (default 1 year) | A PAT's "Notion API" capability includes write access, and Notion offers no read-only PAT. The app still only makes read calls. Admins can restrict who may create PATs. |
+| **Personal access token (PAT)** | Creates one in the developer portal under personal access tokens | Everything the user can access, without sharing | Chosen at creation: 7 days to 1 year (default 1 year) | None beyond the expiry; the app only makes read calls either way |
 
 - **Validation:** the app checks the token with a read-only call (`GET /v1/users/me`), then shows the database picker. Nothing is stored until the check passes.
 - **No refresh:** a 401 means the token expired or was revoked. The app shows "Paste a new token", and local data stays readable.
@@ -505,7 +505,7 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Auth design (Phase 1): public OAuth through a stateless hosted token service. The service returns tokens to the app encrypted (X25519 + AES-GCM) to a one-time key, through a one-request listener on `127.0.0.1`. The `state` is random and HMAC-signed and is checked on return. The hand-back is one-time-use and expires in 120 seconds. See 12. |
 | 2026-10-18 | Token rules: refresh tokens rotate, so a new pair is written to Credential Manager before it is used. Refreshes are serialized (single-flight lock, single app instance). If the token service is unreachable, the app keeps working offline and keeps syncing while the access token is valid; only connect, refresh and revoke need the service. |
 | 2026-10-18 | The token service stores and logs no tokens. The client secret and state-signing key are Cloudflare secrets only, never in the repo. The service code lives in `service/` with its own tests and deploy instructions, and runs on Cloudflare Workers. |
-| 2026-10-18 | Settings → Advanced offers pasted tokens: internal integration tokens (recommended, can be read-only) and personal access tokens (no read-only option; expire after 7 days to 1 year). |
+| 2026-10-18 | Settings → Advanced offers pasted tokens: internal integration tokens and personal access tokens. |
 | 2026-10-18 | A new public Notion integration "Habit Tracker", separate from the extension's: read content only, installation scope Any workspace. Legal and support pages live in `site/` for GitHub Pages, ready before the integration is submitted for Notion's review. |
 | 2026-10-18 | Notion API version `2026-03-11`, using data-source endpoints (`/v1/data_sources/{id}/query`). `notion-client` ≥ 3.1 with its built-in retries plus our own rate limiter. `settings` gains `data_source_id`, `auth_kind`, `workspace_id` and `workspace_name`. |
 | 2026-10-18 | Time zones: `zoneinfo` with the `tzdata` package (Windows has no IANA database). Date-time values without an offset are localized using the property's `time_zone`. |
