@@ -1,0 +1,9 @@
+# gitleaks settings, used by the pre-commit hook and the CI secret scan.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """Shared hand-off test vectors: keys derived from public seeds by
+tests/support/handoff_reference.py. tests/test_handoff.py fails if the file differs from the
+generator's output, so no other value can be added to it."""
+paths = ['''^service/test/fixtures/handoff-v1\.json$''']

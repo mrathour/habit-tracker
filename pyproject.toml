@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 authors = [{ name = "Mayank Rathour" }]
 dependencies = [
+    "cryptography>=46",
     "pywebview>=6.2.1",
 ]
 

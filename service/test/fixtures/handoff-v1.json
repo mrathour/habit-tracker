@@ -1,0 +1,55 @@
+{
+  "protocol": "habit-tracker handoff v1 (docs/handoff-protocol.md)",
+  "note": "Test-only keys and fake tokens. Regenerate: uv run python -m tests.support.handoff_reference",
+  "now": 1792310400,
+  "state": "eyJ2IjoxLCJuIjoidGVzdCIsInAiOjUyNzMxLCJrIjoidGVzdCIsImUiOjB9.c2lnbmF0dXJl",
+  "app_private_key": "wKsg-Nlqopj1sDHfhVJve4UcCe63U00GG8VsS8J2yHA",
+  "app_public_key": "grRb5kylLIRCN7DWJCUeIAQfMqK7Zf6JmV-mE6quUgI",
+  "cases": [
+    {
+      "name": "ok_full",
+      "ephemeral_private_key": "U8JvwEJq3K7L6L_W_ymW-xa5SvqgseZfhffEZDXsC4s",
+      "ephemeral_public_key": "Jl_j3SXjf_b-w0MSpjitOasYWNIxhlV7h7ANCsF7NFc",
+      "nonce": "W3SJdpz0-GaCZUtu",
+      "plaintext": "{\"v\":1,\"exp\":1792310520,\"result\":\"ok\",\"token\":{\"access_token\":\"ntn_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"refresh_token\":\"nrt_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\",\"bot_id\":\"2f1b4c1e-0000-4000-8000-000000000001\",\"workspace_id\":\"2f1b4c1e-0000-4000-8000-000000000002\",\"workspace_name\":\"Mayank's Notion · Työtila\",\"workspace_icon\":\"https://example.test/icon.png\"}}",
+      "envelope": "ASZf490l43_2_sNDEqY4rTmrGFjSMYZVe4ewDQrBezRXW3SJdpz0-GaCZUtu8q2K43Qx4K6gJ4k6DRLdW4bB4VlaOTYInH54TiZXkXL0vNHuPPI9eqYGUjTNK0VlzVXG_Qfa5cgS5grs5gtUKL7MI1DYypRJNtkM3EO0uZrymtnWA0lBmf5vhbzPkDfJca_07i6ASXXrTwvlU2gPK-7oN2YqWcOzAIZMowiw-DCzrHtBV5H2hX5wnycEY9Pxh4Nc03fgBCWhOiDC_HJWipqJl5mx7QZw2FK5pivPiZTXdzBT4VxjyEAK9J57mBQsjbBc91pPObukaPnNlSYb0CaDYwfxAUrnSNhbYQsN42pyIiuyScRD26kdwL8d6QX45rDRHIVA4QpsTVChjKtuPMzVupe6QzyVOU--WYSdxZpU4om73cmaZ4l1rlWjWhVTEmcg6hRKmlTVkVmLhOAQqcmmUXXX_BQ1OHPRJVV2rjwpWcvmwNLF4-WzSr0E_rdmTZ-vVAM0c7TUsj_L2tDG13BqWJOmuOet69HFkav3PFZ-_Y1ynElbNzt1LL8KbcFvOGrq",
+      "expect": "ok"
+    },
+    {
+      "name": "ok_null_workspace_details",
+      "ephemeral_private_key": "4R1fKB1-owVpgSMAiixv22GapYI2qMdmLCigsRoDjT4",
+      "ephemeral_public_key": "ned3pK5va6yvoBq3bhVdqabtZqL6gF8grgENl1L54xc",
+      "nonce": "BkaGA-H4-NEiIRDS",
+      "plaintext": "{\"v\":1,\"exp\":1792310520,\"result\":\"ok\",\"token\":{\"access_token\":\"ntn_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\",\"refresh_token\":\"nrt_DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\",\"bot_id\":\"bot-3\",\"workspace_id\":\"ws-3\",\"workspace_name\":null,\"workspace_icon\":null}}",
+      "envelope": "AZ3nd6Sub2usr6Aat24VXamm7Wai-oBfIK4BDZdS-eMXBkaGA-H4-NEiIRDSfLCWNljzxfcRHdjfTFgx4kXSPCS1NwTGMrfbrSgGPa5-ByQAcooPptqR5bG0mCJU_intx1BN7-EJ-HVd376dOl7PlHOFZsKU9DjBcsbNxpuHayYZyo0hVjogHoshOo04YMDQaLiYhuUuI72saXJn2LXOPl3AJtnIUrjTKpFl_SihyI3S1ASUrx6qOmNQL9GgsBPWj02WKSdDhOcIDh8iyguf4aGAdzl77EWfOq7pXJqQ8Yw6u3ph4JaF9WC95a9jCaHHZgmRU0erhQWLePtWcryYh4wbBs13com4aczHlwZMjRLzDwIgv3Msy9KXx6ZgOP27YHARY9kyq_hujXZdeu3oxy6IIOqtAh8cNufPJEs",
+      "expect": "ok"
+    },
+    {
+      "name": "error_access_denied",
+      "ephemeral_private_key": "xP8lnifhN5yLFe03Ke7AWIvDRy_grRl2vn4EoBkKegg",
+      "ephemeral_public_key": "MpijnCKRd4yv7QCF_pOI_gEGFYkUX_SmgCoI9poJUis",
+      "nonce": "Fz7Ipn8qqD33b3Ro",
+      "plaintext": "{\"v\":1,\"exp\":1792310520,\"result\":\"error\",\"error\":\"access_denied\"}",
+      "envelope": "ATKYo5wikXeMr-0Ahf6TiP4BBhWJFF_0poAqCPaaCVIrFz7Ipn8qqD33b3RoKvum7Y6YbrTdhXWVT_zGt8uhgPZL0qv2fdr1Q1IBOzI-H-_iTUp6bbgwVcgvnm3BhjGn_2wG1r3PMlTmJaCmDZQLzeuzEMTKcms9cGU_pwCj",
+      "expect": "error"
+    },
+    {
+      "name": "error_notion_unreachable",
+      "ephemeral_private_key": "yfyzfxVpqqamD0lnBAyCRrF1EsW8bQBHccKuelwa8a8",
+      "ephemeral_public_key": "u_7_4KxU8FCIupB0I0RoqzOlZYPXCLrlyuQnEHdJH0M",
+      "nonce": "NsTxPs8s01yS_dEn",
+      "plaintext": "{\"v\":1,\"exp\":1792310520,\"result\":\"error\",\"error\":\"notion_unreachable\"}",
+      "envelope": "Abv-_-CsVPBQiLqQdCNEaKszpWWD1wi65crkJxB3SR9DNsTxPs8s01yS_dEnLPEg5f9s2EtJxKQBD_ZTjhdbJRkyIusOtCg19PHiqA5KarwVVK5SLNh-XPZYplGDDgeVsqZbitmQdgi5Oe7wKW4DCZIEv1NBQC9jIsNgZzbagrR3Mh4",
+      "expect": "error"
+    },
+    {
+      "name": "expired",
+      "ephemeral_private_key": "J_jsiwKJRV0HiOsd4uzccvZPURHqZLnth6AtvhjCxpw",
+      "ephemeral_public_key": "AIPl4Pd0t9tfR_vnCgKRaiQN77aSIDiG4rAkI9I1Iz8",
+      "nonce": "X0UQsP7E5KLawqX1",
+      "plaintext": "{\"v\":1,\"exp\":1792310399,\"result\":\"error\",\"error\":\"access_denied\"}",
+      "envelope": "AQCD5eD3dLfbX0f75woCkWokDe-2kiA4huKwJCPSNSM_X0UQsP7E5KLawqX1iHCCLBgxkLWyPzhifMC5Qsk5CDEuHGWWrC4YQekU9nqQjI-7lpwU_WKPs1XNGNjJ_HdunybLQSOz8mqO9hXC0ZnctyGXkSb8di87LagYff7F",
+      "expect": "expired"
+    }
+  ]
+}
