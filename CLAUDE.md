@@ -16,19 +16,20 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 **Phase 0: Project setup** is complete and approved (2026-10-17).
 
-**Current: Phase 1: Explore the Chrome extension** at `C:\Users\LENOVO\Documents\JS\myNotionNotes`, on the branch `phase-1-explore-extension`.
+**Phase 1: Explore the Chrome extension** is complete and approved (2026-10-18, PR #1). Its output is `docs/extension-notes.md` and the auth design in `PLAN.md` section 12.
 
-- Read the extension. **Do not modify, build or run anything in it,** and never copy tokens or secrets from it into notes, logs or commits; mask any you find and tell the user where they are.
-- Write `docs/extension-notes.md`. It should cover:
-  - the auth flow, including how tokens are obtained, stored and refreshed, and whether a client secret or backend is involved;
-  - every Notion API endpoint it calls, with the `Notion-Version` header used;
-  - its pagination, rate-limit, retry and error handling;
-  - how it reads property values (dates, titles, relations, numbers, unique IDs), especially time zones;
-  - which pieces are worth porting to Python, and what must not be copied.
-- Propose an auth design for the desktop app against `PLAN.md` section 12: compare the options and recommend one.
-- Open a pull request, summarize, and wait for the user's approval. **Do not start Phase 2.**
+**Current: Phase 2: Scaffold**, on the branch `phase-2-scaffold`.
 
-**Next: Phase 2: Scaffold** (see `PLAN.md` section 15).
+- Back end: Python 3.12 project managed with `uv`, using the `app/` layout in `PLAN.md` section 14, with ruff and pytest configured.
+- Front end: React + TypeScript (strict) + Vite in `ui/`, with ECharts and TanStack Table installed.
+- Desktop shell: a pywebview window with the JS bridge, in dev mode (Vite dev server, hot reload) and normal mode (built `ui/dist`). The UI calls a Python method and shows the result, and Python pushes events to the UI.
+- `%APPDATA%\HabitTracker\` paths (database, logs), created on first run.
+- The SQLite schema from `PLAN.md` section 11 with versioned migrations, tested on a new database and on re-runs.
+- Rotating logs that never contain tokens or secrets (tested), and readable in-window error messages instead of crashes or blank screens.
+- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks, Dependabot, and `main` branch protection if the GitHub plan allows it.
+- Fill in the Commands section below, record decisions in `PLAN.md`, open a pull request, and wait for the user's approval. **Do not start Phase 3.**
+
+**Next: Phase 3: Connect** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
