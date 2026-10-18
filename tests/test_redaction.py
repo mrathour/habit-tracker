@@ -28,7 +28,7 @@ from app.redaction import (
         ("password = hunter2-hunter2", "hunter2-hunter2"),
         ("https://x.test/cb?code=abc123def456&state=s1", "abc123def456"),
         ("https://x.test/cb?state=signed.state.value", "signed.state.value"),
-        ('"private_key": "MC4CAQAwBQYDK2VuBCIEI"', "MC4CAQAwBQYDK2VuBCIEI"),
+        ('"private_key": "MC4CAQAwBQYDK2VuBCIEI"', "MC4CAQAwBQYDK2VuBCIEI"),  # gitleaks:allow
     ],
 )
 def test_patterns_mask_secret_shapes(text: str, leaked: str) -> None:

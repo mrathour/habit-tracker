@@ -1,0 +1,74 @@
+# Install once per clone:  uv run pre-commit install
+# Run everything by hand:  uv run pre-commit run --all-files
+# Update hook versions:    uv run pre-commit autoupdate
+default_install_hook_types: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=no]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^ui/tsconfig.*\.json$ # tsconfig allows comments
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  # Secret scanning. GitHub's secret scanning isn't available for this private repo, so every
+  # commit is checked locally and in CI.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 38bfb07c0c64c304f47eb52090f8288150c77730 # frozen: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # The UI hooks use the project's own tools from ui/node_modules (run `npm --prefix ui ci`).
+  - repo: local
+    hooks:
+      - id: uv-lock
+        name: uv.lock is up to date
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: uv run --frozen mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: prettier
+        name: prettier (ui)
+        entry: node ui/node_modules/prettier/bin/prettier.cjs --write --ignore-unknown
+        language: system
+        files: ^ui/
+        exclude: ^ui/package-lock\.json$
+      - id: eslint
+        name: eslint (ui)
+        entry: npm --prefix ui run lint
+        language: system
+        files: ^ui/.*\.(ts|tsx|js)$
+        pass_filenames: false
+      - id: tsc
+        name: TypeScript type check (ui)
+        entry: npm --prefix ui run typecheck
+        language: system
+        files: ^ui/.*\.(ts|tsx)$|^ui/tsconfig.*\.json$
+        pass_filenames: false

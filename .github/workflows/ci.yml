@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHONUTF8: "1"
+  UV_FROZEN: "1"
+  GITLEAKS_VERSION: "8.30.1"
+
+jobs:
+  python:
+    name: Python (ruff, mypy, pytest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github
+      - name: Ruff format
+        run: uv run ruff format --check
+      - name: mypy
+        run: uv run mypy
+      - name: pytest
+        run: uv run pytest --cov --cov-report=term
+
+  ui:
+    name: UI (lint, type check, test, build)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Prettier
+        run: npm run format:check
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript type check
+        run: npm run typecheck
+      - name: Vitest
+        run: npm test
+      - name: Build
+        run: npx vite build
+
+  e2e:
+    name: End-to-end (real window)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: |
+          uv sync --locked
+          npm --prefix ui ci
+      - name: Build UI
+        run: npm --prefix ui run build
+      - name: WebView2 runtime version
+        shell: pwsh
+        run: (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}').pv
+      - name: Headless self-check
+        shell: pwsh
+        run: |
+          $env:HABIT_TRACKER_HOME = Join-Path $env:RUNNER_TEMP 'habit-tracker-home'
+          uv run habit-tracker --self-check
+      - name: Window tests (normal mode, dev mode, startup error)
+        run: uv run pytest -m gui -v
+
+  hygiene:
+    name: Repository hygiene (pre-commit)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: pre-commit hooks
+        # The Python and UI checks run in their own jobs; secrets are scanned below.
+        env:
+          SKIP: ruff-check,ruff-format,mypy,prettier,eslint,tsc,gitleaks,no-commit-to-branch
+        run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (checksum verified)
+        shell: pwsh
+        run: |
+          $base = "https://github.com/gitleaks/gitleaks/releases/download/v$env:GITLEAKS_VERSION"
+          $zip = "gitleaks_${env:GITLEAKS_VERSION}_windows_x64.zip"
+          $dir = Join-Path $env:RUNNER_TEMP 'gitleaks'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Invoke-WebRequest "$base/$zip" -OutFile (Join-Path $dir $zip)
+          Invoke-WebRequest "$base/gitleaks_${env:GITLEAKS_VERSION}_checksums.txt" -OutFile (Join-Path $dir 'checksums.txt')
+          $expected = (Select-String -Path (Join-Path $dir 'checksums.txt') -Pattern ([regex]::Escape($zip))).Line.Split(' ')[0]
+          $actual = (Get-FileHash (Join-Path $dir $zip) -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { throw "gitleaks checksum mismatch: $actual vs $expected" }
+          Expand-Archive (Join-Path $dir $zip) -DestinationPath $dir -Force
+          Add-Content $env:GITHUB_PATH $dir
+      - name: Scan the full history
+        run: gitleaks git --redact --no-banner --verbose .

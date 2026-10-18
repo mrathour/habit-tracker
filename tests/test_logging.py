@@ -19,7 +19,7 @@ from app.redaction import REDACTED, Secret, register_secret
 # Fake values in the shapes real ones take. None of them is a real credential.
 NOTION_INTERNAL_TOKEN = "secret_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v"
 NOTION_NEW_TOKEN = "ntn_" + "123456789012345678901234567890abcdefABCDEF1234"
-OAUTH_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.ZmFrZS1hY2Nlc3MtdG9rZW4.c2lnbmF0dXJl"
+OAUTH_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.ZmFrZS1hY2Nlc3MtdG9rZW4.c2lnbmF0dXJl"  # gitleaks:allow
 REFRESH_TOKEN = "rt-" + "9f8e7d6c5b4a39281706f5e4d3c2b1a0"
 CLIENT_SECRET = "cs-" + "Zx9Yw8Vu7Ts6Rq5Po4Nm3Lk2Ji1Hg0Fe"
 OAUTH_CODE = "code-" + "0a1b2c3d4e5f60718293a4b5c6d7e8f9"
