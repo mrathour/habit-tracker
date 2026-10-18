@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
-import { contentSecurityPolicy } from "./build/csp.ts";
+import { contentSecurityPolicy } from "./plugins/csp.ts";
 
 // The desktop app loads the production build over file://, where module scripts can't load
 // other files, so the build is a single self-contained index.html (see PLAN.md 10: no local
@@ -26,7 +26,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "build/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "plugins/**/*.test.ts"],
     restoreMocks: true,
   },
 });
