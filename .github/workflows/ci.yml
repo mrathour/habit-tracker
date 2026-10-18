@@ -102,7 +102,7 @@ jobs:
         run: |
           $env:HABIT_TRACKER_HOME = Join-Path $env:RUNNER_TEMP 'habit-tracker-home'
           uv run habit-tracker --self-check
-      - name: Window tests (normal mode, dev mode, startup error)
+      - name: Window tests (normal mode, dev mode, startup error, blank window)
         run: uv run pytest -m gui -v
 
   hygiene:

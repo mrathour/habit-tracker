@@ -109,3 +109,11 @@ def test_startup_failure_shows_an_error_page(tmp_path: Path) -> None:
     assert results["detail"]
     assert "habit_tracker.db" in results["detail"]
     assert "startup failed" in log
+
+
+def test_blank_window_is_replaced_by_an_error_page(tmp_path: Path) -> None:
+    results, log = run_harness(tmp_path, "blank-ui")
+    assert results["title"] == "Something went wrong"
+    assert "didn't finish loading" in results["text"]
+    assert "Error ID" in results["text"]
+    assert "loading the interface failed" in log

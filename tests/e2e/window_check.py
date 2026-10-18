@@ -9,7 +9,8 @@ It opens the app exactly as ``habit-tracker --diagnostics`` does (in the data fo
 ``HABIT_TRACKER_HOME``), then inspects it with ``evaluate_js``. Scenarios:
 
 * ``ui``: click through the bridge check and every diagnostics error button;
-* ``startup-error``: start with a damaged database file and read the error page.
+* ``startup-error``: start with a damaged database file and read the error page;
+* ``blank-ui``: load a page that never reports ready and read the error page that replaces it.
 
 Results are written as JSON; the process exits 0 even when a check fails, so the test can
 report every finding.
@@ -104,18 +105,31 @@ def read_error_page(window: Any, results: dict[str, Any]) -> None:
         window.destroy()
 
 
-SCENARIOS = {"ui": drive, "startup-error": read_error_page}
+def use_blank_ui(paths: AppPaths) -> None:
+    """Serve a page that loads but never starts the app, and shorten the watchdog."""
+    import app.main
+
+    dist = paths.root / "blank-dist"
+    dist.mkdir(exist_ok=True)
+    (dist / "index.html").write_text("<!doctype html><html><body></body></html>", encoding="utf-8")
+    app.main.ui_dist_dir = lambda: dist  # type: ignore[attr-defined]
+    app.main.UI_READY_TIMEOUT_S = 2.0  # type: ignore[misc]
 
 
 def main() -> int:
     out = Path(sys.argv[1])
-    scenario = SCENARIOS[sys.argv[2]]
+    name = sys.argv[2]
+    scenario = drive if name == "ui" else read_error_page
     dev = "--dev" in sys.argv[3:]
     args = parse_args(["--diagnostics", *(["--dev"] if dev else [])])
     paths = AppPaths.resolve()
     paths.ensure()
-    if scenario is read_error_page:
+    if name == "startup-error":
         paths.database.write_bytes(b"this is not a SQLite database" * 100)
+    elif name == "blank-ui":
+        use_blank_ui(paths)
+    elif name != "ui":
+        raise SystemExit(f"Unknown scenario {name!r}")
 
     from app.log import configure_logging
 

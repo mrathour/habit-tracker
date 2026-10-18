@@ -37,8 +37,10 @@ logger = logging.getLogger(__name__)
 
 WINDOW_SIZE: Final = (1280, 820)
 WINDOW_MIN_SIZE: Final = (960, 640)
-#: How long the UI may take to report ready before the window shows an error instead.
-UI_READY_TIMEOUT_S: Final = {"normal": 15.0, "dev": 60.0}
+#: How long the built UI may take to report ready before the window shows an error instead.
+#: Dev mode has no watchdog: Vite's error overlay and the inspector show what went wrong, and
+#: replacing the page would stop hot reload from recovering once the code is fixed.
+UI_READY_TIMEOUT_S: Final = 15.0
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -228,7 +230,7 @@ def run_window(
         showing_ui = False
         window.load_html(error_html(report, "Something went wrong"))
 
-    watchdog = UiReadyWatchdog(UI_READY_TIMEOUT_S[mode], on_ui_timeout)
+    watchdog = UiReadyWatchdog(UI_READY_TIMEOUT_S, on_ui_timeout)
     context.on_ui_ready = watchdog.ui_ready
 
     def on_before_load() -> None:
@@ -236,7 +238,7 @@ def run_window(
         watchdog.page_loading()
 
     def on_loaded() -> None:
-        if showing_ui:
+        if showing_ui and mode == "normal":
             watchdog.page_loaded()
 
     window.events.before_load += on_before_load
