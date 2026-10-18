@@ -44,3 +44,8 @@ Desktop.ini
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Cloudflare Worker (service/)
+.wrangler/
+.dev.vars
+.dev.vars.*
