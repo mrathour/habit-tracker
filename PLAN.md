@@ -209,7 +209,7 @@ Durations always come from End − Start. Entries excluded by validation do not 
 - **If the window itself can't open** (for example WebView2 is missing), a Windows message box explains.
 
 **Token service:** a Cloudflare Worker in TypeScript, under `service/`.
-- **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-pool-workers` for tests.
+- **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-plugin` for tests (the renamed `@cloudflare/vitest-pool-workers`), running inside the Workers runtime.
 - **Crypto:** WebCrypto for X25519, HKDF and AES-GCM. If the Workers runtime lacks X25519, use `@noble/curves`.
 - **Details:** see 12.2.
 
@@ -252,6 +252,7 @@ Indexes on `start_utc` and `parent_task_id`.
 - **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`;
 - **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
+- **Policy:** `acknowledged_policy_version` (13);
 - **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`.
 
 The local schema version is kept by the migration system (`schema_migrations` and `PRAGMA user_version`), not in `settings`.
@@ -285,12 +286,12 @@ The rest of the app doesn't care which path produced the token.
 ### 12.2 Token service (`service/`)
 
 - **What it is:** a stateless Cloudflare Worker written in TypeScript, in this repo under `service/`.
-  - **Tests:** its own tests (Vitest with `@cloudflare/vitest-pool-workers`).
+  - **Tests:** its own tests (Vitest with `@cloudflare/vitest-plugin`).
   - **Documentation:** `service/README.md` has the setup, configuration and deploy instructions (`wrangler deploy`).
   - **CI:** runs its tests.
 - **Secrets:** the client secret and the state-signing key exist **only as Cloudflare secrets** (`wrangler secret put`), never in the repo, CI logs or any file. The client ID is a plain Worker variable.
 - **Stores nothing:** no KV, D1 or other storage. Tokens exist only in memory for the length of one request.
-- **Logs no tokens:** logs hold only the route, status code and duration, never request or response bodies, query strings or auth headers.
+- **Logs no tokens:** logs hold only the route, method, status code and duration, never request or response bodies, query strings or auth headers. Cloudflare's automatic invocation logs are turned off (`invocation_logs = false`), because they record the full request URL, which on `/callback` holds Notion's one-time code and the `state`.
 - **Response headers:** `Cache-Control: no-store` and `Referrer-Policy: no-referrer` on every response.
 - **Rate limit:** requests are rate-limited per IP address with Cloudflare's rate-limiting binding.
 - **Routes:**
@@ -376,6 +377,11 @@ The user chooses which kind they are pasting:
 - **Data:** stays in `%APPDATA%\HabitTracker\` across reinstalls.
 - **Code signing:** not used at first, so testers will see a SmartScreen warning. It can be added later as a separate build step.
 - **Distribution:** a GitHub Actions workflow builds `Setup.exe` whenever a version tag (`vX.Y.Z`) is pushed and attaches it to a GitHub Release. Other users download the app from the Releases page.
+- **Privacy policy change notices** (a promise in the privacy policy):
+  - **When:** if a change affects how data is handled, it ships only in a new app version, and that version shows a notice the first time it opens, before it does anything differently.
+  - **How the app knows:** each build bundles a policy version number and a plain-language summary of the change. The app compares that number with the `acknowledged_policy_version` setting (11) and shows the notice when the bundled one is newer. Acknowledging the notice saves the new number.
+  - **Fresh installs:** they show no notice. The current version is saved when the user first connects, which is where the policy is linked.
+  - **No website contact:** the app never checks the website for policy changes, because the policy says it uses the website only when connecting, renewing and disconnecting.
 
 ## 14. Project layout
 
@@ -404,7 +410,7 @@ habit-tracker/
 ├── service/                 # Token service: Cloudflare Worker (TypeScript), Phase 3
 │   ├── src/                 # /start, /callback, /refresh, /revoke, /health, page routes
 │   ├── pages/               # home, privacy policy, terms, support (served by the Worker)
-│   ├── test/                # Vitest + @cloudflare/vitest-pool-workers
+│   ├── test/                # Vitest + @cloudflare/vitest-plugin
 │   ├── wrangler.toml        # no secrets; those are set with `wrangler secret put`
 │   └── README.md            # setup, configuration and deploy instructions
 ├── app/                     # Python back end
@@ -443,7 +449,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
 | 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
-| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, and a README for other users. | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. |
+| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
 
 ### 15.1 Phase 0 checklist: project setup
 
@@ -563,3 +569,8 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Phase 2 review: approved pinning TypeScript to 6.0.x until typescript-eslint supports TypeScript 7 (10). |
 | 2026-10-18 | Phase 2 review: Node.js moves to Scoop (`nodejs-lts`, 24.22.0), replacing the nodejs.org install in `C:\Program Files\nodejs`, so every tool now comes from Scoop. `.node-version` pins CI to the same exact version, and `ui/package.json` `engines` requires `>=24.22.0` (enforced by `engine-strict` in `ui/.npmrc`). jsdom is upgraded to 30, which needs Node 24.15 or later. |
 | 2026-10-18 | Phase 2 review: no branch protection on `main`, and no GitHub Pro upgrade for it. The manual rule stays: never merge a pull request without the user's explicit approval, and only with CI passing. This supersedes the plan to apply branch protection later. |
+| 2026-10-18 | Phase 3 plan: OAuth is tried with the public connection as soon as it exists. Notion's docs say review is needed only for a Marketplace listing (not part of v1), so a review is submitted only if Notion blocks unreviewed connections. The encrypted hand-off travels in the loopback redirect's query string; it can't be decrypted once the app's one-time key is gone. Workspace icons reach the UI as data URIs (a first letter for pasted tokens), keeping the UI's CSP strict. The full OAuth flow is tested offline against a fake Notion with `wrangler dev`. |
+| 2026-10-18 | Phase 3: the Worker's tests use `@cloudflare/vitest-plugin`, the renamed and maintained successor of the deprecated `@cloudflare/vitest-pool-workers`, with Vitest 5 (as in `ui/`). |
+| 2026-10-18 | Phase 3: Cloudflare's automatic invocation logs are off for the Worker, because they record full request URLs (Notion's code and the state on `/callback`). Only the Worker's own lines (route, method, status, duration) are kept (12.2). |
+| 2026-10-18 | Phase 3: the public pages' wording follows what the app does for each way of connecting, including that a personal access token has the creator's full access, though the app sends only read requests. Terms are governed by the laws of India, with the courts at New Delhi having jurisdiction. The privacy policy keeps the "not aimed at children under 13" line and dates from the first deploy. |
+| 2026-10-18 | Phase 3: the privacy policy promises notice of data-handling changes. Notices ship only inside app updates, shown on the first launch of the new version, and the app never contacts the website for them. Tracked as a Phase 8 requirement (13, 15), with a new `acknowledged_policy_version` setting (11). |

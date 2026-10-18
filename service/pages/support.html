@@ -10,16 +10,26 @@
 <h2>Common questions</h2>
 
 <h3>My database doesn't appear in the list</h3>
-<p>Habit Tracker can only see the pages and databases you share with it. To share your work log:</p>
+<p>
+  If you used <em>Connect to Notion</em>, Habit Tracker can only see the pages and databases you
+  share with it. To share your work log:
+</p>
 <ol>
   <li>Open the database in Notion.</li>
-  <li>Click <strong>•••</strong> at the top right, then <strong>Connections</strong>.</li>
-  <li>Find <strong>Habit Tracker</strong> and confirm.</li>
+  <li>Click <strong>•••</strong> at the top right, then <strong>More</strong>.</li>
+  <li>In the <strong>Connections</strong> group, click <strong>Add connections</strong>.</li>
+  <li>Search for <strong>Habit Tracker</strong> and select it.</li>
   <li>In the app, refresh the database list.</li>
 </ol>
 <p>
   You can also click <em>Connect again</em> in the app and choose the database while approving
   access.
+</p>
+<p>
+  If you pasted an <strong>internal integration token</strong>, follow the same steps but choose
+  your own integration's name. If you pasted a <strong>personal access token</strong>, no sharing is
+  needed: the app sees every database you can see in Notion, so check that you can open the database
+  yourself, in the same workspace.
 </p>
 
 <h3>The app asks me to reconnect</h3>
@@ -30,9 +40,10 @@
 
 <h3>I connected with a pasted token and it stopped working</h3>
 <p>
-  The token has expired or been revoked. Personal access tokens expire on the date you chose when
-  you created them. Create a new token in Notion's developer portal, then paste it in the app under
-  Settings → Advanced.
+  The token has expired or been revoked. Personal access tokens expire after the period you chose
+  when you created them (7, 30, 90 or 180 days, or 1 year, which is the default), and Notion can't
+  extend them. Create a new token under <strong>Personal access tokens</strong> in Notion's
+  developer portal, then paste it in the app under Settings → Advanced.
 </p>
 
 <h3>How do I remove Habit Tracker's access?</h3>

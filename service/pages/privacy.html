@@ -14,14 +14,33 @@
 </p>
 
 <h2>What the app reads from Notion</h2>
+<p>
+  The app only ever <strong>reads</strong> from Notion. It never creates, changes, comments on or
+  deletes anything in your workspace. What Notion allows it to reach depends on how you connect:
+</p>
 <ul>
   <li>
-    The app asks Notion for <strong>read-only</strong> access. It can't create, change, comment on
-    or delete anything in your workspace, and Notion itself refuses any attempt to.
+    <strong>Connect to Notion</strong> (the usual way): Notion gives the app read-only access to the
+    pages and databases you choose to share with it while connecting. Notion itself refuses any
+    attempt to change them.
   </li>
   <li>
-    It reads only the pages and databases you choose to share with it when you connect. From those,
-    it uses the one database you pick as your work log.
+    <strong>Internal integration token</strong> (pasted in the app's advanced settings): the app can
+    reach only the pages and databases you share with that integration, with the capabilities you
+    gave it in Notion. Giving it <em>Read content</em> only is recommended.
+  </li>
+  <li>
+    <strong>Personal access token</strong> (pasted in the app's advanced settings): Notion gives the
+    app the same access as the person who created the token, to everything they can see, without any
+    sharing step. Notion doesn't limit these tokens to reading, but the app still sends only read
+    requests.
+  </li>
+</ul>
+<p>Whichever way you connect:</p>
+<ul>
+  <li>
+    To let you pick your work log, the app lists the names of the databases it can reach. After
+    that, it reads entries from the one database you picked and nothing else.
   </li>
   <li>
     From that database it copies each entry's start and end times, its name, its link to a parent
@@ -118,5 +137,7 @@
 <h2>Changes</h2>
 <p>
   If this policy changes, the new version will appear here with a new date. If a change affects how
-  your data is handled, the app will say so before it applies.
+  your data is handled, it will only arrive in a new version of the app, and that version will tell
+  you about it the first time you open it, before it does anything differently. The app doesn't
+  check this website for changes.
 </p>

@@ -12,7 +12,8 @@ export const PAGE_VALUES = {
   EFFECTIVE_DATE: "{{EFFECTIVE_DATE}}",
   OPERATOR_NAME: "{{OPERATOR_NAME}}",
   CONTACT_EMAIL: "{{CONTACT_EMAIL}}",
-  GOVERNING_LAW: "{{GOVERNING_LAW}}",
+  GOVERNING_LAW:
+    "These terms are governed by the laws of India, and the courts at New Delhi have jurisdiction.",
 } as const;
 
 interface Page {
