@@ -1,0 +1,98 @@
+[project]
+name = "habit-tracker"
+version = "0.1.0"
+description = "Windows desktop app that turns a Notion Work Log into habit-tracking charts."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "Mayank Rathour" }]
+dependencies = [
+    "pywebview>=6.2.1",
+]
+
+[project.scripts]
+habit-tracker = "app.main:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.12,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["."]
+extend-exclude = ["ui", "service"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "N",       # pep8-naming
+    "UP",      # pyupgrade
+    "B",       # bugbear
+    "A",       # builtins shadowing
+    "C4",      # comprehensions
+    "SIM",     # simplify
+    "PTH",     # use pathlib
+    "RUF",     # ruff-specific
+    "S",       # bandit security checks
+    "BLE",     # blind except
+    "T20",     # no print
+    "LOG",     # logging misuse
+    "G",       # logging format
+    "PT",      # pytest style
+    "ANN",     # type annotations
+    "TRY",     # exception handling
+    "DTZ",     # naive datetimes (timestamps must be UTC-aware)
+]
+ignore = [
+    "TRY003",  # long messages in exception constructors are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "ANN401", "BLE001", "TRY301"]
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["webview", "webview.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "-m", "not gui"]
+markers = [
+    "gui: opens the real app window; needs WebView2 and a built UI (run with -m gui)",
+]
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
