@@ -13,8 +13,8 @@ Checked on 2026-10-17 on Windows 10 Pro (build 21996).
 | GitHub CLI | 2.102.0 | `gh --version` |
 | Python | 3.12.10 | `py -3.12 --version` |
 | uv | 0.11.12 | `uv --version` |
-| Node.js | v24.7.0 (LTS) | `node --version` |
-| npm | 11.5.1 | `npm --version` |
+| Node.js | v24.22.0 (LTS, Scoop `nodejs-lts`; updated 2026-10-18) | `node --version` |
+| npm | 11.19.1 | `npm --version` |
 | WebView2 Runtime | 155.0.4283.60 | see below |
 | Inno Setup | 6.7.3 (via Scoop, `iscc` on PATH) | `scoop list inno-setup`, `iscc /?` |
 | VS Code (optional) | 1.142.0 | `code --version` |
@@ -95,7 +95,15 @@ The full list of run, test, lint and build commands is in `CLAUDE.md` → Comman
 
 ## Node.js version
 
-CI uses the latest Node.js 24 (`.node-version`). This machine has 24.7.0, which works, but some test packages already require newer versions: jsdom 30 needs 24.15 or later, so the UI tests use jsdom 29 for now. This machine's Node.js is in `C:\Program Files\nodejs` (not installed through Scoop). Moving it to Scoop's `nodejs-lts` (24.22.0 available) would allow jsdom 30, and would match the Scoop-only rule in `PLAN.md`.
+Node.js is installed with Scoop (`scoop install nodejs-lts`), like every other tool. On this machine it is 24.22.0 in `~\scoop\apps\nodejs-lts\current`, and `where.exe node` should list only that path. An older install from the nodejs.org installer (`C:\Program Files\nodejs`) was removed on 2026-10-18.
+
+The version is pinned in three places that must agree:
+
+- **`.node-version`** (`24.22.0`): the exact version CI installs.
+- **`ui/package.json` `engines`** (`>=24.22.0`): the minimum version. `ui/.npmrc` sets `engine-strict=true`, so `npm ci` fails on an older Node instead of only warning.
+- **This machine**: `scoop update nodejs-lts` keeps it current.
+
+When you raise the minimum, change `.node-version` and `engines` together. Dependabot doesn't update `.node-version`.
 
 ## Notion data for testing
 
@@ -130,44 +138,4 @@ Repository: https://github.com/mrathour/habit-tracker (private).
 | Merge options | Squash merge only; head branches deleted automatically after merging |
 | Dependabot alerts | Enabled |
 | Secret scanning and push protection | Not available: GitHub rejects them for this private repository on the current plan (requires GitHub Secret Protection). Re-check when the repo becomes public, where they are free. |
-| Branch protection on `main` | Not available: GitHub rejects branch protection and rulesets for this private repository on the current plan (checked 2026-10-18, Phase 2). Apply the settings below when the repo becomes public or the plan is upgraded. |
-
-### Branch protection settings to apply later
-
-When the repository becomes public or the plan is upgraded, protect `main` with these settings:
-
-- Every CI check must pass, on a branch that is up to date with `main`.
-- Changes arrive through pull requests only.
-- Linear history (squash merges).
-- No force pushes or deletions, for admins too.
-- Conversations must be resolved before merging.
-
-Save the JSON below as `protection.json` and run:
-
-```powershell
-gh api -X PUT repos/mrathour/habit-tracker/branches/main/protection --input protection.json
-```
-
-```json
-{
-  "required_status_checks": {
-    "strict": true,
-    "checks": [
-      { "context": "Python (ruff, mypy, pytest)" },
-      { "context": "UI (lint, type check, test, build)" },
-      { "context": "End-to-end (real window)" },
-      { "context": "Repository hygiene (pre-commit)" },
-      { "context": "Secret scan (gitleaks)" }
-    ]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": { "required_approving_review_count": 0 },
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true
-}
-```
-
-The check names must match the job names in `.github/workflows/ci.yml`. Required approvals are 0 because a solo owner can't approve their own pull request; the user's approval is given in the conversation before merging.
+| Branch protection on `main` | Not used. GitHub offers it for this private repository only with GitHub Pro, and the user decided against both (Phase 2 review, 2026-10-18). Manual rule: a pull request is merged only after CI passes and the user gives explicit approval. |
