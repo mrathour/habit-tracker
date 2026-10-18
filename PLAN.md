@@ -195,7 +195,7 @@ Durations always come from End − Start. Entries excluded by validation do not 
 - **Crypto:** WebCrypto for X25519, HKDF and AES-GCM. If the Workers runtime lacks X25519, use `@noble/curves`.
 - **Details:** see 12.2.
 
-**Legal and support pages:** static HTML in `site/` (home, privacy policy, terms of use, support), published with GitHub Pages (12.1).
+**Legal and support pages:** static pages (home, privacy policy, terms of use, support) served by the token service itself (12.2), so no separate web host is needed.
 
 ## 11. Local data model (SQLite)
 
@@ -250,7 +250,7 @@ The rest of the app doesn't care which path produced the token.
   - a terms of use page;
   - a support page.
 
-  They live in `site/` and are hosted on GitHub Pages (see 16 for the hosting question). We fill in whatever the developer portal's form asks for when the integration is created. Listing on the Notion Marketplace is optional and has its own security review. It is not part of v1.
+  The token service serves them (12.2). We fill in whatever the developer portal's form asks for when the integration is created. Listing on the Notion Marketplace is optional and has its own security review. It is not part of v1.
 - **Redirect URI:** the token service's `https://…/callback`. Only that URI is registered.
 
 ### 12.2 Token service (`service/`)
@@ -273,6 +273,7 @@ The rest of the app doesn't care which path produced the token.
 | `POST /refresh` | Takes a refresh token and calls Notion's token endpoint with `grant_type: refresh_token`. Returns the new token pair. |
 | `POST /revoke` | Takes a token and calls `POST /v1/oauth/revoke`. |
 | `GET /health` | Liveness check, used by the app to explain service outages. |
+| `GET /`, `/privacy`, `/terms`, `/support` | Static pages for the integration's listing in Notion's developer portal and for users. Bundled with the Worker from `service/pages/`. They have no forms and set no cookies. |
 
 ### 12.3 Connect flow (OAuth)
 
@@ -366,11 +367,11 @@ habit-tracker/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
 │   └── extension-notes.md   # Phase 1 output
 ├── service/                 # Token service: Cloudflare Worker (TypeScript), Phase 3
-│   ├── src/                 # /start, /callback, /refresh, /revoke, /health
+│   ├── src/                 # /start, /callback, /refresh, /revoke, /health, page routes
+│   ├── pages/               # home, privacy policy, terms, support (served by the Worker)
 │   ├── test/                # Vitest + @cloudflare/vitest-pool-workers
 │   ├── wrangler.toml        # no secrets; those are set with `wrangler secret put`
 │   └── README.md            # setup, configuration and deploy instructions
-├── site/                    # GitHub Pages: home, privacy policy, terms, support
 ├── app/                     # Python back end
 │   ├── main.py              # pywebview window + JS bridge
 │   ├── notion/              # auth (OAuth, pasted tokens, refresh), client, pagination, property readers
@@ -394,7 +395,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 0. Project setup | Install and verify every tool, configure Git, create the GitHub repository, and add the housekeeping files. Full checklist in 15.1. | The private GitHub repo exists with the first commit pushed, every tool reports its version, and `docs/setup.md` records them. |
 | 1. Explore the extension | Read the Chrome extension at `C:\Users\LENOVO\Documents\JS\myNotionNotes` without modifying it. Document its auth flow, Notion API calls, pagination and error handling in `docs/extension-notes.md`. Propose the auth design. | The user approves the notes and the auth design. |
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
-| 3. Connect | **Before the integration exists:** write and publish the `site/` pages. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | The user connects through OAuth and sees their Work Log in the picker. Connecting with an internal integration token and with a PAT also works. Logout revokes and removes the token. Service and app tests pass in CI. |
+| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | The user connects through OAuth and sees their Work Log in the picker. Connecting with an internal integration token and with a PAT also works. Logout revokes and removes the token. Service and app tests pass in CI. |
 | 4. Map | Build auto-matching, the review screen, extra-field selection, and missing-required-field errors. | The author's Work Log maps correctly, and a fixture schema missing an end-time column shows a clear error (covered by tests and viewable in the UI with that fixture). |
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
@@ -474,7 +475,6 @@ Phase 0 is the only phase committed directly to `main`.
 
 - License: undecided. It must be chosen before the repository or app is shared publicly.
 - Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
-- GitHub Pages for `site/`: on the GitHub Free plan, Pages works only for public repositories. This repo is private. Options: GitHub Pro, a small separate public repository for `site/` only, or making this repo public. To decide before Phase 3.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
@@ -506,6 +506,7 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Token rules: refresh tokens rotate, so a new pair is written to Credential Manager before it is used. Refreshes are serialized (single-flight lock, single app instance). If the token service is unreachable, the app keeps working offline and keeps syncing while the access token is valid; only connect, refresh and revoke need the service. |
 | 2026-10-18 | The token service stores and logs no tokens. The client secret and state-signing key are Cloudflare secrets only, never in the repo. The service code lives in `service/` with its own tests and deploy instructions, and runs on Cloudflare Workers. |
 | 2026-10-18 | Settings → Advanced offers pasted tokens: internal integration tokens and personal access tokens. |
-| 2026-10-18 | A new public Notion integration "Habit Tracker", separate from the extension's: read content only, installation scope Any workspace. Legal and support pages live in `site/` for GitHub Pages, ready before the integration is submitted for Notion's review. |
+| 2026-10-18 | A new public Notion integration "Habit Tracker", separate from the extension's: read content only, installation scope Any workspace. Legal and support pages are served by the token service, ready before the integration is submitted for Notion's review. |
 | 2026-10-18 | Notion API version `2026-03-11`, using data-source endpoints (`/v1/data_sources/{id}/query`). `notion-client` ≥ 3.1 with its built-in retries plus our own rate limiter. `settings` gains `data_source_id`, `auth_kind`, `workspace_id` and `workspace_name`. |
+| 2026-10-18 | The home, privacy, terms and support pages are served by the Cloudflare Worker instead of GitHub Pages. That removes the need for a separate host and a GitHub plan for Pages on a private repo. |
 | 2026-10-18 | Time zones: `zoneinfo` with the `tzdata` package (Windows has no IANA database). Date-time values without an offset are localized using the property's `time_zone`. |

@@ -225,7 +225,7 @@ This responds to PLAN.md section 12: support other users' workspaces through OAu
   - name "Habit Tracker";
   - capabilities: **Read content only** (no insert, update or comments; user information not requested);
   - installation scope: **any workspace**. Notion says this **can't be changed after creation**, so it must be right the first time, or other users can't connect later.
-  - The portal may ask for website, privacy policy and terms URLs. These can be pages in this repo or on GitHub Pages.
+  - The portal may ask for website, privacy policy and terms URLs. These can be served by the token service itself.
   - This is a separate integration from WebNotes, which needs write access.
 - **Token service:** a small stateless HTTPS service, for example a Cloudflare Worker. Its folder would be `service/` in this repo. It holds the client ID and secret as platform secrets and has four routes:
   - `GET /callback`: Notion's registered redirect URI;
