@@ -19,7 +19,7 @@ A Windows desktop app that tracks a work habit: time spent working. The user log
 ## 2. Scope
 
 **In scope (v1)**
-- Notion login and Work Log database selection
+- Notion login (OAuth through the token service, or a pasted internal integration token or PAT) and Work Log database selection
 - Automatic column mapping with user review, required-field checks, and user-chosen extra fields
 - Full sync and quick sync into a local SQLite database
 - Non-blocking validation of entries
@@ -113,11 +113,29 @@ Quick sync catches new entries and edits, including renamed tasks. It does **not
 
 ### 6.4 Mechanics
 
-- **Pagination:** pages of 100 using Notion's `start_cursor`.
-- **Rate limits:** stay under about 3 requests per second. On HTTP 429, wait for the `Retry-After` time and retry. Retry temporary network and server errors with backoff.
+- **API version and endpoints:** every request sends `Notion-Version: 2026-03-11`.
+  - Rows come from `POST /v1/data_sources/{data_source_id}/query`.
+  - The schema check (6.3) reads `GET /v1/data_sources/{data_source_id}`.
+  - Quick sync filters on the `last_edited_time` timestamp.
+- **Pagination:** pages of 100 using Notion's `start_cursor`. Relation values with `has_more: true` (more than 25 references) are completed with `GET /v1/pages/{page_id}/properties/{property_id}`, paginated.
+- **Rate limits:** stay under about 3 requests per second with our own request limiter. On HTTP 429, wait for the `Retry-After` time and retry. Retry temporary network and server errors with backoff. Both retry behaviours come from `notion-client`'s retry options. Every request has an explicit timeout.
+- **Auth errors:** a 401 triggers one serialized token refresh, then a single retry (12.5). A pasted token that gets a 401 asks for a new token. Neither case ever deletes local data.
 - **Threading:** syncs run on a background thread. The UI receives progress events (pages fetched, entries added, updated or removed) and stays responsive.
-- **States the UI shows:** not yet synced; quick sync in progress (subtle indicator); full sync in progress (progress bar); completed with a summary; failed with a clear reason and a retry button; offline, where the app shows local data and a note that sync was skipped.
-- **Time zones:** all timestamps are stored in UTC and shown in the computer's local time zone.
+- **States the UI shows:**
+  - not yet synced;
+  - quick sync in progress (subtle indicator);
+  - full sync in progress (progress bar);
+  - completed with a summary;
+  - failed with a clear reason and a retry button;
+  - offline, where the app shows local data and a note that sync was skipped;
+  - "Reconnect to Notion" (the refresh was rejected);
+  - "Paste a new token" (a pasted token expired or was revoked);
+  - token service unreachable, which only matters when a refresh is needed (12.5).
+- **Time zones:** all timestamps are stored in UTC and shown in the computer's local time zone. Notion date values are parsed like this:
+  - **Offset** (`Z`, `+05:30`): convert directly to UTC.
+  - **No offset, with `time_zone`:** localize with `zoneinfo.ZoneInfo(time_zone)`, then convert to UTC.
+  - **Date only:** this is the Missing time issue (5).
+  - **Range** (an `end` inside one mapped date property): ignored. Each app field reads only `start`.
 
 ## 7. Dashboard
 
@@ -159,15 +177,25 @@ Durations always come from End − Start. Entries excluded by validation do not 
 | Purpose | Choice |
 |---|---|
 | Desktop window | `pywebview` (uses WebView2 on Windows) |
-| Notion API | `notion-client`; auth and helpers ported from the author's Chrome extension |
+| Notion API | `notion-client` ≥ 3.1, with `notion_version="2026-03-11"` set explicitly. Rows come from the **data-source** endpoints: `POST /v1/data_sources/{id}/query`, plus search filtered to data sources. Its built-in retries on 429 and 5xx (with `Retry-After` and backoff) are used. Patterns from the Chrome extension are re-implemented, not copied (`docs/extension-notes.md`). |
 | Local database | built-in `sqlite3` |
 | Token storage | `keyring` (Windows Credential Manager) |
+| Time zones | `zoneinfo` plus the `tzdata` package, because Windows has no system IANA database |
+| OAuth hand-back crypto | `cryptography` (X25519, HKDF-SHA256, AES-256-GCM) |
+| Single instance | A Windows named mutex, so only one copy of the app runs |
 | Dependencies | `uv` |
 | Tests and linting | `pytest`, `ruff` |
 
 **Front end:** React + TypeScript built with Vite, Apache ECharts for charts, and TanStack Table for the raw log. The built front end is bundled as static files.
 
-**Bridge:** pywebview's JS API. The UI calls Python methods directly, for example `window.pywebview.api.full_sync()`, and Python pushes sync progress to the UI. There is no local web server.
+**Bridge:** pywebview's JS API. The UI calls Python methods directly, for example `window.pywebview.api.full_sync()`, and Python pushes sync progress to the UI. There is no local web server. The only listener is the one-request OAuth hand-back on `127.0.0.1` during Connect (12.3).
+
+**Token service:** a Cloudflare Worker in TypeScript, under `service/`.
+- **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-pool-workers` for tests.
+- **Crypto:** WebCrypto for X25519, HKDF and AES-GCM. If the Workers runtime lacks X25519, use `@noble/curves`.
+- **Details:** see 12.2.
+
+**Legal and support pages:** static pages (home, privacy policy, terms of use, support) served by the token service itself (12.2), so no separate web host is needed.
 
 ## 11. Local data model (SQLite)
 
@@ -192,19 +220,125 @@ The database file lives at `%APPDATA%\HabitTracker\habit_tracker.db`.
 
 Indexes on `start_utc` and `parent_task_id`.
 
-**`settings`** is a key–value table (`key TEXT PRIMARY KEY, value TEXT` holding JSON). Its keys are: `database_id`, `database_title`, `mapping` (app field → property ID, plus the list of extra fields), `streak_threshold_minutes`, `week_start`, `midnight_rule`, `last_successful_sync`, `last_full_sync`, and `schema_version`.
+**`settings`** is a key–value table (`key TEXT PRIMARY KEY, value TEXT` holding JSON). Its keys are:
+- **Notion source:** `database_id`, `data_source_id`, `database_title`;
+- **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`;
+- **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
+- **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
+- **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`, `schema_version`.
+
+Tokens are never stored here (12.5).
 
 Notion page links are built when displayed: `https://www.notion.so/<page id without dashes>`.
 
 ## 12. Authentication
 
-The final design will be decided in **Phase 1**, after studying how the author's Chrome extension authenticates with Notion.
+Decided in Phase 1 (see `docs/extension-notes.md` section 8). There are two ways to connect, and both end with a token in Windows Credential Manager.
+- **Main path:** public OAuth through a small hosted **token service**.
+- **Advanced path:** a pasted token, for workspaces where public integrations are blocked or for anyone who doesn't want a third-party service involved.
 
-- **Goal:** support other users connecting their own workspaces, which means a public Notion integration with OAuth.
-- **Constraint:** the OAuth client secret must not be embedded in the distributed app. The options are a small token-exchange service, or another approach the extension already uses.
-- **Permissions:** read content only.
-- **Token storage:** always in Windows Credential Manager via `keyring`; never in plain files or logs.
-- **Logout** removes the token. The user chooses whether to keep or clear the local data.
+The rest of the app doesn't care which path produced the token.
+
+### 12.1 Notion integration
+
+- **A new public integration named "Habit Tracker"**, separate from the WebNotes extension's integration.
+- **Capabilities:** read content only. No insert, update or comment capabilities, and no user information. Notion itself then refuses any write, which backs up the "never write to Notion" rule.
+- **Installation scope: Any workspace.** Notion doesn't allow changing this after creation, and it is required for other users to connect.
+- **Review:** Notion's authorization guide says the integration's Authorization URL appears only after the public connection is **submitted for review**. Its public docs don't list what the review requires, so we prepare these before creating the integration:
+  - a home page;
+  - a privacy policy;
+  - a terms of use page;
+  - a support page.
+
+  The token service serves them (12.2). We fill in whatever the developer portal's form asks for when the integration is created. Listing on the Notion Marketplace is optional and has its own security review. It is not part of v1.
+- **Redirect URI:** the token service's `https://…/callback`. Only that URI is registered.
+
+### 12.2 Token service (`service/`)
+
+- **What it is:** a stateless Cloudflare Worker written in TypeScript, in this repo under `service/`.
+  - **Tests:** its own tests (Vitest with `@cloudflare/vitest-pool-workers`).
+  - **Documentation:** `service/README.md` has the setup, configuration and deploy instructions (`wrangler deploy`).
+  - **CI:** runs its tests.
+- **Secrets:** the client secret and the state-signing key exist **only as Cloudflare secrets** (`wrangler secret put`), never in the repo, CI logs or any file. The client ID is a plain Worker variable.
+- **Stores nothing:** no KV, D1 or other storage. Tokens exist only in memory for the length of one request.
+- **Logs no tokens:** logs hold only the route, status code and duration, never request or response bodies, query strings or auth headers.
+- **Response headers:** `Cache-Control: no-store` and `Referrer-Policy: no-referrer` on every response.
+- **Rate limit:** requests are rate-limited per IP address with Cloudflare's rate-limiting binding.
+- **Routes:**
+
+| Route | Purpose |
+|---|---|
+| `POST /start` | The app sends its loopback port and one-time public key. The service returns a signed `state`: an HMAC over a 32-byte random nonce, the port, the public key and an expiry 10 minutes ahead. |
+| `GET /callback` | Notion's redirect URI. It verifies the `state` signature and expiry, then exchanges the code using the client secret. It encrypts the token response to the app's public key and redirects to `http://127.0.0.1:<port>/done`. |
+| `POST /refresh` | Takes a refresh token and calls Notion's token endpoint with `grant_type: refresh_token`. Returns the new token pair. |
+| `POST /revoke` | Takes a token and calls `POST /v1/oauth/revoke`. |
+| `GET /health` | Liveness check, used by the app to explain service outages. |
+| `GET /`, `/privacy`, `/terms`, `/support` | Static pages for the integration's listing in Notion's developer portal and for users. Bundled with the Worker from `service/pages/`. They have no forms and set no cookies. |
+
+### 12.3 Connect flow (OAuth)
+
+1. **Set up the hand-back.** The app generates a one-time **X25519 key pair**. It opens a listener on `127.0.0.1` at a random free port, which accepts **one** request and times out after 5 minutes.
+2. **Get a signed state.** The app calls `/start` and gets back a signed `state`.
+3. **Consent in the browser.** The app opens the system browser at Notion's Authorization URL (`owner=user`, the service's redirect URI, that `state`). The user picks their workspace and **shares the Work Log database**.
+4. **Exchange on the service.** Notion redirects to `/callback`, which checks `state` and exchanges the code.
+5. **Encrypt the result.** The service encrypts the token response to the app's public key: X25519, then HKDF-SHA256, then AES-256-GCM, with `state` as associated data. The response holds `access_token`, `refresh_token`, `bot_id`, `workspace_id`, `workspace_name` and an `exp` 120 seconds ahead.
+6. **Redirect to the app.** The service redirects the browser to the app's listener. The plain token never appears in a URL, the browser history or any log.
+7. **Accept the hand-back, once.** The app checks that `state` matches the one it sent and that `exp` hasn't passed, then decrypts. **The hand-back is one-time-use:**
+   - the listener closes after the first request;
+   - the private key is destroyed after the first decryption attempt, whether it succeeds or fails;
+   - a replayed or late payload can't be decrypted.
+8. **Store the token.** The app saves the token pair to Credential Manager. Then it shows the database picker (12.6).
+
+**Edge cases:**
+- **Busy port:** the app picks another random port.
+- **Browser closed or timeout:** the app returns to the Connect screen with a message.
+- **State mismatch, bad signature or expired payload:** the app rejects it and offers a retry.
+- **Service unreachable:** the app shows a clear message and points to the advanced path.
+
+### 12.4 Pasted tokens (Settings → Advanced)
+
+The user chooses which kind they are pasting:
+
+| Kind | How the user gets it | Access | Expiry | Notes the app shows |
+|---|---|---|---|---|
+| **Internal integration token** | Creates an internal connection in Notion's developer portal with **Read content** only, then shares the Work Log with it (Add connections) | Only pages shared with the connection | Doesn't expire unless regenerated | The recommended choice for this path, because it can be limited to reading |
+| **Personal access token (PAT)** | Creates one in the developer portal under personal access tokens | Everything the user can access, without sharing | Chosen at creation: 7 days to 1 year (default 1 year) | None beyond the expiry; the app only makes read calls either way |
+
+- **Validation:** the app checks the token with a read-only call (`GET /v1/users/me`), then shows the database picker. Nothing is stored until the check passes.
+- **No refresh:** a 401 means the token expired or was revoked. The app shows "Paste a new token", and local data stays readable.
+- **Logout:** deletes the stored token. Pasted tokens can't be revoked through the API by the app, so it explains how to revoke the token in Notion.
+
+### 12.5 Token storage, refresh and offline behaviour
+
+- **Storage**
+  - The app keeps one Credential Manager entry via `keyring`: service `HabitTracker`, account `notion`.
+  - The entry is a small JSON blob, `{kind, access_token, refresh_token?, bot_id?, obtained_at}`, kept well under the 2,560-byte credential limit.
+  - Tokens never go into SQLite, plain files, logs, crash reports or the UI. `settings` holds only non-secret metadata (11).
+- **Refresh tokens rotate, so writes come first:**
+  1. When `/refresh` returns a new pair, the app **writes it to Credential Manager before using it**.
+  2. If the write fails, the sync stops with a clear error. The pair is kept in memory, and the next attempt retries the write before any API call.
+- **Refreshes are serialized:**
+  - **One at a time:** a single lock lets only one refresh run.
+  - **Shared result:** callers that hit a 401 while a refresh is running wait for its result instead of starting their own.
+  - **Single instance:** the app runs as a single instance (a Windows named mutex), so the in-process lock covers every caller.
+- **When refresh happens:** only on a 401 from Notion, once per request. If it fails with `invalid_grant`, the app shows "Reconnect to Notion" and keeps all local data available.
+- **If the service is unreachable:**
+  - Only connect, refresh and revoke depend on it.
+  - The app keeps working offline, and **keeps syncing directly with Notion while the current access token is valid**.
+  - If a refresh is needed during an outage, the sync shows "Couldn't renew Notion access: token service unreachable", with a retry button. Local data stays fully usable.
+
+### 12.6 Database picker
+
+- **Search:** the picker pages through `POST /v1/search` filtered to data sources (Notion API 2026-03-11).
+- **Display:** it shows each data source with its parent database's title.
+- **Saved:** `database_id` and `data_source_id` (11).
+- **Empty:** if nothing is found, the picker explains how to share the database with the connection and offers "Connect again".
+
+### 12.7 Logout
+
+1. **Revoke:** for OAuth, the app calls `/revoke`. A failure doesn't block logout.
+2. **Delete:** it deletes the Credential Manager entry.
+3. **Ask:** it asks whether to keep or clear the local data, as before.
 
 ## 13. Windows packaging
 
@@ -232,9 +366,15 @@ habit-tracker/
 ├── docs/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
 │   └── extension-notes.md   # Phase 1 output
+├── service/                 # Token service: Cloudflare Worker (TypeScript), Phase 3
+│   ├── src/                 # /start, /callback, /refresh, /revoke, /health, page routes
+│   ├── pages/               # home, privacy policy, terms, support (served by the Worker)
+│   ├── test/                # Vitest + @cloudflare/vitest-pool-workers
+│   ├── wrangler.toml        # no secrets; those are set with `wrangler secret put`
+│   └── README.md            # setup, configuration and deploy instructions
 ├── app/                     # Python back end
 │   ├── main.py              # pywebview window + JS bridge
-│   ├── notion/              # auth, client, pagination
+│   ├── notion/              # auth (OAuth, pasted tokens, refresh), client, pagination, property readers
 │   ├── sync/                # quick sync, full sync, schema check
 │   ├── mapping/             # auto-matcher, extra fields
 │   ├── validation/          # entry checks
@@ -255,7 +395,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 0. Project setup | Install and verify every tool, configure Git, create the GitHub repository, and add the housekeeping files. Full checklist in 15.1. | The private GitHub repo exists with the first commit pushed, every tool reports its version, and `docs/setup.md` records them. |
 | 1. Explore the extension | Read the Chrome extension at `C:\Users\LENOVO\Documents\JS\myNotionNotes` without modifying it. Document its auth flow, Notion API calls, pagination and error handling in `docs/extension-notes.md`. Propose the auth design. | The user approves the notes and the auth design. |
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
-| 3. Connect | Build Notion login, token storage, logout, and the database picker. | The user logs in and sees their Work Log in the picker. |
+| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | The user connects through OAuth and sees their Work Log in the picker. Connecting with an internal integration token and with a PAT also works. Logout revokes and removes the token. Service and app tests pass in CI. |
 | 4. Map | Build auto-matching, the review screen, extra-field selection, and missing-required-field errors. | The author's Work Log maps correctly, and a fixture schema missing an end-time column shows a clear error (covered by tests and viewable in the UI with that fixture). |
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
@@ -333,8 +473,9 @@ Phase 0 is the only phase committed directly to `main`.
 
 ## 16. Open items
 
-- Auth design: decided in Phase 1.
 - License: undecided. It must be chosen before the repository or app is shared publicly.
+- Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
+- Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
 ## 17. Decisions log
@@ -361,3 +502,11 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-17 | No Notion test databases. Development uses the original Work Log. Broken-entry and missing-column cases are tested with pytest fixtures; the Phase 4 and 5 "Done when" checks were updated to match. |
 | 2026-10-17 | Supersedes the previous row: the user created **Work Log (test)** (same schema as the Work Log) for manual testing. Pytest fixtures still cover every broken case and the missing end-time column. There is no separate no-end-time database; the fixture covers that case. |
 | 2026-10-17 | Duration mismatch is checked only when the range is valid (both times present, End not before Start). An entry with a missing time or an invalid range shows only that issue, never a mismatch as well. |
+| 2026-10-18 | Auth design (Phase 1): public OAuth through a stateless hosted token service. The service returns tokens to the app encrypted (X25519 + AES-GCM) to a one-time key, through a one-request listener on `127.0.0.1`. The `state` is random and HMAC-signed and is checked on return. The hand-back is one-time-use and expires in 120 seconds. See 12. |
+| 2026-10-18 | Token rules: refresh tokens rotate, so a new pair is written to Credential Manager before it is used. Refreshes are serialized (single-flight lock, single app instance). If the token service is unreachable, the app keeps working offline and keeps syncing while the access token is valid; only connect, refresh and revoke need the service. |
+| 2026-10-18 | The token service stores and logs no tokens. The client secret and state-signing key are Cloudflare secrets only, never in the repo. The service code lives in `service/` with its own tests and deploy instructions, and runs on Cloudflare Workers. |
+| 2026-10-18 | Settings → Advanced offers pasted tokens: internal integration tokens and personal access tokens. |
+| 2026-10-18 | A new public Notion integration "Habit Tracker", separate from the extension's: read content only, installation scope Any workspace. Legal and support pages are served by the token service, ready before the integration is submitted for Notion's review. |
+| 2026-10-18 | Notion API version `2026-03-11`, using data-source endpoints (`/v1/data_sources/{id}/query`). `notion-client` ≥ 3.1 with its built-in retries plus our own rate limiter. `settings` gains `data_source_id`, `auth_kind`, `workspace_id` and `workspace_name`. |
+| 2026-10-18 | The home, privacy, terms and support pages are served by the Cloudflare Worker instead of GitHub Pages. That removes the need for a separate host and a GitHub plan for Pages on a private repo. |
+| 2026-10-18 | Time zones: `zoneinfo` with the `tzdata` package (Windows has no IANA database). Date-time values without an offset are localized using the property's `time_zone`. |

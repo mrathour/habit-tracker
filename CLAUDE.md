@@ -14,25 +14,21 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 ## Current phase
 
-**Phase 0: Project setup.** Follow `PLAN.md` section 15.1 completely.
+**Phase 0: Project setup** is complete and approved (2026-10-17).
 
-1. Ask the user to settle the decisions listed at the top of 15.1: name, visibility, license, and project folder location.
-2. Run every tool check command and report the results. Ask before installing anything missing; then open a new terminal and re-check.
-3. Tell the user exactly which manual steps they need to do: `gh auth login` and creating the Notion test databases. Wait until they confirm.
-4. Configure Git, create the repository files, make the first commit, and push to a new private GitHub repo.
-5. Apply the GitHub settings: labels, milestones, merge options, and security options.
-6. Write `docs/setup.md`, summarize the result, and wait for approval.
+**Current: Phase 1: Explore the Chrome extension** at `C:\Users\LENOVO\Documents\JS\myNotionNotes`, on the branch `phase-1-explore-extension`.
 
-**Next: Phase 1: Explore the Chrome extension** at `C:\Users\LENOVO\Documents\JS\myNotionNotes`.
-
-- Read the extension. **Do not modify it.**
+- Read the extension. **Do not modify, build or run anything in it,** and never copy tokens or secrets from it into notes, logs or commits; mask any you find and tell the user where they are.
 - Write `docs/extension-notes.md`. It should cover:
   - the auth flow, including how tokens are obtained, stored and refreshed, and whether a client secret or backend is involved;
-  - every Notion API call it makes;
-  - its pagination, rate-limit and error handling;
-  - which pieces are worth porting to Python.
-- Propose an auth design for the desktop app that fits `PLAN.md` section 12.
-- Stop and wait for the user's approval.
+  - every Notion API endpoint it calls, with the `Notion-Version` header used;
+  - its pagination, rate-limit, retry and error handling;
+  - how it reads property values (dates, titles, relations, numbers, unique IDs), especially time zones;
+  - which pieces are worth porting to Python, and what must not be copied.
+- Propose an auth design for the desktop app against `PLAN.md` section 12: compare the options and recommend one.
+- Open a pull request, summarize, and wait for the user's approval. **Do not start Phase 2.**
+
+**Next: Phase 2: Scaffold** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
