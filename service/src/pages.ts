@@ -9,7 +9,7 @@ import terms from "../pages/terms.html";
  * reviewed in a single diff.
  */
 export const PAGE_VALUES = {
-  EFFECTIVE_DATE: "{{EFFECTIVE_DATE}}",
+  EFFECTIVE_DATE: "18 October 2026",
   OPERATOR_NAME: "Mayank Rathour",
   CONTACT_EMAIL: "mrathour1997@gmail.com",
   GOVERNING_LAW:
