@@ -10,8 +10,8 @@ import terms from "../pages/terms.html";
  */
 export const PAGE_VALUES = {
   EFFECTIVE_DATE: "{{EFFECTIVE_DATE}}",
-  OPERATOR_NAME: "{{OPERATOR_NAME}}",
-  CONTACT_EMAIL: "{{CONTACT_EMAIL}}",
+  OPERATOR_NAME: "Mayank Rathour",
+  CONTACT_EMAIL: "mrathour1997@gmail.com",
   GOVERNING_LAW:
     "These terms are governed by the laws of India, and the courts at New Delhi have jurisdiction.",
 } as const;
