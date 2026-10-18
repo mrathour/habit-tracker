@@ -72,7 +72,30 @@ WebView2 check:
    gh repo clone mrathour/habit-tracker
    ```
 
-Project install, run, test and build commands are added in Phase 2 (see `CLAUDE.md` → Commands).
+8. **Install the project's dependencies and git hook**, from the repository folder:
+
+   ```powershell
+   uv sync
+   npm --prefix ui ci
+   uv run pre-commit install
+   ```
+
+   `uv sync` creates `.venv` with Python 3.12 and the locked packages. The first commit after `pre-commit install` takes a few minutes, because pre-commit downloads its hook tools (including a Go toolchain for gitleaks) into `~\.cache\pre-commit`. Later commits are fast.
+
+9. **Check that everything works:**
+
+   ```powershell
+   npm --prefix ui run build
+   uv run pytest
+   uv run pytest -m gui
+   uv run habit-tracker --dev
+   ```
+
+The full list of run, test, lint and build commands is in `CLAUDE.md` → Commands.
+
+## Node.js version
+
+CI uses the latest Node.js 24 (`.node-version`). This machine has 24.7.0, which works, but some test packages already require newer versions: jsdom 30 needs 24.15 or later, so the UI tests use jsdom 29 for now. This machine's Node.js is in `C:\Program Files\nodejs` (not installed through Scoop). Moving it to Scoop's `nodejs-lts` (24.22.0 available) would allow jsdom 30, and would match the Scoop-only rule in `PLAN.md`.
 
 ## Notion data for testing
 
@@ -107,4 +130,44 @@ Repository: https://github.com/mrathour/habit-tracker (private).
 | Merge options | Squash merge only; head branches deleted automatically after merging |
 | Dependabot alerts | Enabled |
 | Secret scanning and push protection | Not available: GitHub rejects them for this private repository on the current plan (requires GitHub Secret Protection). Re-check when the repo becomes public, where they are free. |
-| Branch protection on `main` | To be set up in Phase 2, once CI exists. Private-repo branch protection and rulesets also depend on the GitHub plan. |
+| Branch protection on `main` | Not available: GitHub rejects branch protection and rulesets for this private repository on the current plan (checked 2026-10-18, Phase 2). Apply the settings below when the repo becomes public or the plan is upgraded. |
+
+### Branch protection settings to apply later
+
+When the repository becomes public or the plan is upgraded, protect `main` with these settings:
+
+- Every CI check must pass, on a branch that is up to date with `main`.
+- Changes arrive through pull requests only.
+- Linear history (squash merges).
+- No force pushes or deletions, for admins too.
+- Conversations must be resolved before merging.
+
+Save the JSON below as `protection.json` and run:
+
+```powershell
+gh api -X PUT repos/mrathour/habit-tracker/branches/main/protection --input protection.json
+```
+
+```json
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      { "context": "Python (ruff, mypy, pytest)" },
+      { "context": "UI (lint, type check, test, build)" },
+      { "context": "End-to-end (real window)" },
+      { "context": "Repository hygiene (pre-commit)" },
+      { "context": "Secret scan (gitleaks)" }
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
+  "restrictions": null,
+  "required_linear_history": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+```
+
+The check names must match the job names in `.github/workflows/ci.yml`. Required approvals are 0 because a solo owner can't approve their own pull request; the user's approval is given in the conversation before merging.

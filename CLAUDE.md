@@ -63,4 +63,50 @@ Update this section whenever a new phase begins.
 
 ## Commands
 
-To be filled in during Phase 2, covering how to install dependencies, run in development mode, run the tests, and build the installer.
+PowerShell, from the repository root. The installer build arrives in Phase 8.
+
+**Install** (once per clone, and after dependency changes):
+
+```powershell
+uv sync                       # Python 3.12 venv in .venv, from uv.lock
+npm --prefix ui ci            # UI packages, from ui/package-lock.json
+uv run pre-commit install     # git hook: lint, format, type check, secret scan on commit
+```
+
+**Run:**
+
+```powershell
+uv run habit-tracker --dev            # dev mode: starts (or reuses) the Vite dev server, hot reload, inspector, diagnostics
+npm --prefix ui run build             # build ui/dist, needed before normal mode
+uv run habit-tracker                  # normal mode: loads ui/dist over file://
+uv run habit-tracker --diagnostics    # normal mode with the diagnostics panel
+uv run habit-tracker --self-check     # start up without a window, print a JSON report
+```
+
+- `npm --prefix ui run dev` starts Vite on its own; `--dev` then reuses it.
+- `$env:HABIT_TRACKER_HOME = "C:\some\folder"` points the app at a different data folder than `%APPDATA%\HabitTracker` (for example a throwaway copy); `Remove-Item Env:HABIT_TRACKER_HOME` to undo.
+
+**Test:**
+
+```powershell
+uv run pytest                 # back-end tests (excludes the window tests)
+uv run pytest -m gui          # end-to-end tests that open the real window; build the UI first
+uv run pytest --cov           # with coverage
+npm --prefix ui test          # UI tests (Vitest)
+```
+
+**Lint, format and type check:**
+
+```powershell
+uv run ruff check             # add --fix to apply fixes
+uv run ruff format            # add --check to only report
+uv run mypy
+npm --prefix ui run lint
+npm --prefix ui run format    # format:check to only report
+npm --prefix ui run typecheck
+uv run pre-commit run --all-files   # every hook, as CI runs them
+```
+
+**Build the UI:** `npm --prefix ui run build` type-checks, then writes the single-file bundle to `ui/dist/index.html`.
+
+**Database migrations:** add `app/db/migrations/NNNN_short_name.sql` with the next number. Never edit a migration that is on `main`.

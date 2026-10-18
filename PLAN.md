@@ -184,11 +184,29 @@ Durations always come from End − Start. Entries excluded by validation do not 
 | OAuth hand-back crypto | `cryptography` (X25519, HKDF-SHA256, AES-256-GCM) |
 | Single instance | A Windows named mutex, so only one copy of the app runs |
 | Dependencies | `uv` |
-| Tests and linting | `pytest`, `ruff` |
+| Tests and linting | `pytest` (with `pytest -m gui` end-to-end tests that drive the real window), `ruff`, `mypy --strict` |
 
-**Front end:** React + TypeScript built with Vite, Apache ECharts for charts, and TanStack Table for the raw log. The built front end is bundled as static files.
+**Front end:** React + TypeScript built with Vite, Apache ECharts for charts, and TanStack Table for the raw log.
+- **TypeScript 6.0** in strict mode (plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`). TypeScript 7 waits until typescript-eslint supports it.
+- **Tooling:** ESLint with type-checked rules, Prettier, and Vitest with Testing Library.
+- **Build:** a single self-contained `ui/dist/index.html`, with every script and style inlined. The app loads it over `file://`, where module scripts can't load other files, so no local web server is needed. The build adds a Content-Security-Policy that allows only the hashes of its own inline scripts, so text from Notion can never run as script.
 
 **Bridge:** pywebview's JS API. The UI calls Python methods directly, for example `window.pywebview.api.full_sync()`, and Python pushes sync progress to the UI. There is no local web server. The only listener is the one-request OAuth hand-back on `127.0.0.1` during Connect (12.3).
+- **Calls never reject.** Every Python method returns `{ok: true, data}` or `{ok: false, error}`, where `error` is an already-logged, redacted report with a short error ID.
+- **Events.** Python pushes events as a `habit-tracker:event` DOM event, `{name, payload}`. Events emitted while the page is loading are buffered until the UI reports it is listening, so none are lost at startup or on reload.
+- **Types.** The TypeScript types in `ui/src/bridge/types.ts` mirror `app/api.py`.
+
+**Run modes**
+- **Normal:** `habit-tracker` loads the built UI.
+- **Dev:** `habit-tracker --dev` loads the Vite dev server, which it starts (or reuses) and stops on exit. It gives hot reload, the web inspector, DEBUG logging to the console, and the diagnostics panel.
+- **Diagnostics:** `--diagnostics` shows the diagnostics panel in normal mode.
+- **Self-check:** `--self-check` starts up without a window and prints a JSON report, for CI.
+
+**Errors and logs**
+- **Logs:** rotating files in `%APPDATA%\HabitTracker\logs\` (2 MB × 5), with UTC timestamps. Every handler masks tokens and secrets: Notion token shapes, `Authorization` headers, secret-named keys, OAuth URL parameters, and any value registered at run time.
+- **Unexpected errors** show a readable message with an error ID instead of a crash or a blank window, and are logged. This covers Python calls, background threads, UI code, promises and rendering.
+- **Startup failures** (database, missing UI, dev server) show an error page in the window. A UI that loads but never reports ready is replaced by the error page after a timeout.
+- **If the window itself can't open** (for example WebView2 is missing), a Windows message box explains.
 
 **Token service:** a Cloudflare Worker in TypeScript, under `service/`.
 - **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-pool-workers` for tests.
@@ -199,7 +217,16 @@ Durations always come from End − Start. Entries excluded by validation do not 
 
 ## 11. Local data model (SQLite)
 
-The database file lives at `%APPDATA%\HabitTracker\habit_tracker.db`.
+The database file lives at `%APPDATA%\HabitTracker\habit_tracker.db`, next to the `logs\` folder. Both are created on first run. The `HABIT_TRACKER_HOME` environment variable points the app at another folder, for tests or a throwaway copy.
+
+**Migrations.** The schema is built by numbered SQL files in `app/db/migrations/` (`0001_initial.sql`, …), applied in order on every start.
+- **Atomic:** each migration runs in its own transaction with its bookkeeping row.
+- **Recorded:** `schema_migrations` (version, name, checksum, applied time) records what was applied, and `PRAGMA user_version` mirrors the latest version.
+- **Safe to re-run:** only missing migrations are applied.
+- **Refusals with a readable message:** a database whose applied migration files have since changed, and a database from a newer app version.
+- **Rule:** never edit a migration once it is on `main`; add a new one.
+
+**Integrity.** Tables are SQLite `STRICT` tables. `CHECK` constraints require every timestamp column to be ISO 8601 UTC ending in `Z`, and the JSON columns to hold valid JSON of the right shape (`extra_fields` an object, `issues` an array, `settings.value` any JSON value). Missing times and End-before-Start are allowed, because those entries are imported and flagged (5).
 
 **`work_logs`**
 
@@ -225,7 +252,9 @@ Indexes on `start_utc` and `parent_task_id`.
 - **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`;
 - **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
-- **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`, `schema_version`.
+- **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`.
+
+The local schema version is kept by the migration system (`schema_migrations` and `PRAGMA user_version`), not in `settings`.
 
 Tokens are never stored here (12.5).
 
@@ -358,11 +387,17 @@ habit-tracker/
 ├── .gitignore
 ├── .gitattributes
 ├── .editorconfig
+├── pyproject.toml           # Python project, ruff, mypy and pytest settings
+├── uv.lock
+├── .python-version          # 3.12
+├── .node-version            # Node.js major for CI
+├── .pre-commit-config.yaml  # hygiene, gitleaks, ruff, mypy, Prettier, ESLint, tsc
+├── .gitleaksignore          # fingerprints of known fake test values
 ├── .github/
 │   ├── ISSUE_TEMPLATE/      # bug report, feature request
 │   ├── pull_request_template.md
-│   ├── dependabot.yml       # Phase 2
-│   └── workflows/           # CI (Phase 2), release (Phase 8)
+│   ├── dependabot.yml       # uv, npm, GitHub Actions
+│   └── workflows/           # ci.yml (Phase 2), release (Phase 8)
 ├── docs/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
 │   └── extension-notes.md   # Phase 1 output
@@ -373,16 +408,24 @@ habit-tracker/
 │   ├── wrangler.toml        # no secrets; those are set with `wrangler secret put`
 │   └── README.md            # setup, configuration and deploy instructions
 ├── app/                     # Python back end
-│   ├── main.py              # pywebview window + JS bridge
+│   ├── main.py              # entry point: run modes, pywebview window, startup error page
+│   ├── api.py               # JS API methods the UI calls
+│   ├── bridge.py            # ok/error response envelope
+│   ├── events.py            # events pushed to the UI
+│   ├── paths.py             # %APPDATA%\HabitTracker locations
+│   ├── log.py, redaction.py # rotating logs; secret masking
+│   ├── errors.py, error_page.py  # error reports with IDs; the in-window error page
+│   ├── devserver.py         # Vite dev server for dev mode
 │   ├── notion/              # auth (OAuth, pasted tokens, refresh), client, pagination, property readers
 │   ├── sync/                # quick sync, full sync, schema check
 │   ├── mapping/             # auto-matcher, extra fields
 │   ├── validation/          # entry checks
 │   ├── stats/               # daily totals, weeks, streaks, midnight split
-│   └── db/                  # schema, migrations, queries
+│   └── db/                  # connections, migrator, migrations/*.sql, queries
 ├── ui/                      # React + Vite front end
-│   └── src/
-├── tests/
+│   ├── src/                 # bridge/, errors/, components/, tests next to the code
+│   └── plugins/             # Vite plugins (Content-Security-Policy)
+├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui)
 └── packaging/               # PyInstaller spec, Inno Setup script
 ```
 
@@ -454,7 +497,7 @@ After installing, open a new terminal so the updated PATH is picked up, then re-
 - **Milestones:** one per phase, 1 to 8.
 - **Pull requests:** allow squash merge only, and delete branches automatically after merging.
 - **Security:** enable Dependabot alerts, plus secret scanning and push protection where your GitHub plan offers them.
-- **Branch protection:** where your plan supports it, protect `main` so CI must pass before merging (enabled once CI exists in Phase 2).
+- **Branch protection:** where your plan supports it, protect `main` so CI must pass before merging. Phase 2 checked this: GitHub refuses both branch protection and rulesets on this private repository on the Free plan. Until the repository is public or the plan is upgraded, the rule "merge only after CI passes and the user approves" is followed by hand (see Open items, and `docs/setup.md` for the settings to apply).
 
 Phase 0 is the only phase committed directly to `main`.
 
@@ -477,6 +520,7 @@ Phase 0 is the only phase committed directly to `main`.
 - Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
+- Branch protection on `main`: unavailable for this private repository on the current GitHub plan (checked in Phase 2). Apply the settings in `docs/setup.md` when the repository becomes public (free there) or the plan is upgraded. Until then, pull requests are merged only after CI passes and the user approves.
 
 ## 17. Decisions log
 
@@ -510,3 +554,9 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Notion API version `2026-03-11`, using data-source endpoints (`/v1/data_sources/{id}/query`). `notion-client` ≥ 3.1 with its built-in retries plus our own rate limiter. `settings` gains `data_source_id`, `auth_kind`, `workspace_id` and `workspace_name`. |
 | 2026-10-18 | The home, privacy, terms and support pages are served by the Cloudflare Worker instead of GitHub Pages. That removes the need for a separate host and a GitHub plan for Pages on a private repo. |
 | 2026-10-18 | Time zones: `zoneinfo` with the `tzdata` package (Windows has no IANA database). Date-time values without an offset are localized using the property's `time_zone`. |
+| 2026-10-18 | Phase 2: the production UI is one self-contained `index.html` (vite-plugin-singlefile) loaded over `file://`, keeping "no local web server" (10). The build adds a Content-Security-Policy that allows only its own inline scripts by hash. pywebview's bridge works under it, which the end-to-end tests check. |
+| 2026-10-18 | Phase 2: TypeScript is pinned to 6.0.x, because typescript-eslint (type-checked linting) supports only TypeScript below 6.1 and TypeScript 7 is current. Dependabot ignores TypeScript ≥ 6.1 until that changes. Also: ESLint, Prettier and Vitest for the UI, and `mypy --strict` for Python. |
+| 2026-10-18 | Phase 2: schema migrations are numbered SQL files recorded in `schema_migrations` with checksums and mirrored in `PRAGMA user_version`. The `schema_version` key is removed from `settings` (11). Tables are `STRICT`, with `CHECK` constraints for UTC timestamps and JSON shapes. |
+| 2026-10-18 | Phase 2: Python methods return an ok/error envelope with logged, redacted error reports and short error IDs. Python pushes events as DOM events, buffered until the UI is ready. Dev mode starts or reuses the Vite dev server. `HABIT_TRACKER_HOME` overrides the data folder. `--diagnostics` and `--self-check` are added (10). |
+| 2026-10-18 | Phase 2: branch protection and rulesets for `main` are unavailable on this private repo on the current GitHub plan ("Upgrade to GitHub Pro or make this repository public"). The intended settings are recorded in `docs/setup.md`, to apply later. Meanwhile, merging only after green CI and the user's approval is a manual rule. |
+| 2026-10-18 | Phase 2: GitHub secret scanning is unavailable on this private repo, so gitleaks scans staged changes in pre-commit and the full history in CI. CI actions are pinned to commit SHAs. End-to-end tests drive the real window in CI (`pytest -m gui`). |
