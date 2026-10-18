@@ -13,8 +13,8 @@ Checked on 2026-10-17 on Windows 10 Pro (build 21996).
 | GitHub CLI | 2.102.0 | `gh --version` |
 | Python | 3.12.10 | `py -3.12 --version` |
 | uv | 0.11.12 | `uv --version` |
-| Node.js | v24.7.0 (LTS) | `node --version` |
-| npm | 11.5.1 | `npm --version` |
+| Node.js | v24.22.0 (LTS, Scoop `nodejs-lts`; updated 2026-10-18) | `node --version` |
+| npm | 11.19.1 | `npm --version` |
 | WebView2 Runtime | 155.0.4283.60 | see below |
 | Inno Setup | 6.7.3 (via Scoop, `iscc` on PATH) | `scoop list inno-setup`, `iscc /?` |
 | VS Code (optional) | 1.142.0 | `code --version` |
@@ -72,7 +72,38 @@ WebView2 check:
    gh repo clone mrathour/habit-tracker
    ```
 
-Project install, run, test and build commands are added in Phase 2 (see `CLAUDE.md` → Commands).
+8. **Install the project's dependencies and git hook**, from the repository folder:
+
+   ```powershell
+   uv sync
+   npm --prefix ui ci
+   uv run pre-commit install
+   ```
+
+   `uv sync` creates `.venv` with Python 3.12 and the locked packages. The first commit after `pre-commit install` takes a few minutes, because pre-commit downloads its hook tools (including a Go toolchain for gitleaks) into `~\.cache\pre-commit`. Later commits are fast.
+
+9. **Check that everything works:**
+
+   ```powershell
+   npm --prefix ui run build
+   uv run pytest
+   uv run pytest -m gui
+   uv run habit-tracker --dev
+   ```
+
+The full list of run, test, lint and build commands is in `CLAUDE.md` → Commands.
+
+## Node.js version
+
+Node.js is installed with Scoop (`scoop install nodejs-lts`), like every other tool. On this machine it is 24.22.0 in `~\scoop\apps\nodejs-lts\current`, and `where.exe node` should list only that path. An older install from the nodejs.org installer (`C:\Program Files\nodejs`) was removed on 2026-10-18.
+
+The version is pinned in three places that must agree:
+
+- **`.node-version`** (`24.22.0`): the exact version CI installs.
+- **`ui/package.json` `engines`** (`>=24.22.0`): the minimum version. `ui/.npmrc` sets `engine-strict=true`, so `npm ci` fails on an older Node instead of only warning.
+- **This machine**: `scoop update nodejs-lts` keeps it current.
+
+When you raise the minimum, change `.node-version` and `engines` together. Dependabot doesn't update `.node-version`.
 
 ## Notion data for testing
 
@@ -107,4 +138,4 @@ Repository: https://github.com/mrathour/habit-tracker (private).
 | Merge options | Squash merge only; head branches deleted automatically after merging |
 | Dependabot alerts | Enabled |
 | Secret scanning and push protection | Not available: GitHub rejects them for this private repository on the current plan (requires GitHub Secret Protection). Re-check when the repo becomes public, where they are free. |
-| Branch protection on `main` | To be set up in Phase 2, once CI exists. Private-repo branch protection and rulesets also depend on the GitHub plan. |
+| Branch protection on `main` | Not used. GitHub offers it for this private repository only with GitHub Pro, and the user decided against both (Phase 2 review, 2026-10-18). Manual rule: a pull request is merged only after CI passes and the user gives explicit approval. |

@@ -1,0 +1,392 @@
+/* Design tokens. Light by default, dark when Windows is in dark mode. */
+:root {
+  color-scheme: light dark;
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-sunken: #f0f0ed;
+  --text: #1d1d1f;
+  --muted: #5c5c63;
+  --border: #dcdcd8;
+  --accent: #2f6f5e;
+  --accent-text: #ffffff;
+  --ok: #2f7d4f;
+  --warn: #8a5a00;
+  --error: #b3261e;
+  --error-surface: #fdeceb;
+  --focus: #2f6f5e;
+
+  --radius: 12px;
+  --radius-small: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161618;
+    --surface: #202023;
+    --surface-sunken: #1a1a1d;
+    --text: #ececee;
+    --muted: #a2a2aa;
+    --border: #34343a;
+    --accent: #7cc4ad;
+    --accent-text: #0f2a22;
+    --ok: #7fd19f;
+    --warn: #f0c36b;
+    --error: #f2b8b5;
+    --error-surface: #3b1f1e;
+    --focus: #7cc4ad;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  user-select: text;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Layout */
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand h1 {
+  font-size: 17px;
+}
+
+.brand-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: linear-gradient(
+    135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 55%, var(--bg))
+  );
+}
+
+.badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.badge.dev {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+.content {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.card h2 {
+  font-size: 15px;
+}
+
+.card p {
+  margin: 0;
+}
+
+/* Status lines */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.status.warn {
+  color: var(--warn);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* Facts list */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 20px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Buttons */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.button {
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 14px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text) 30%, var(--border));
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.button.small {
+  font-size: 12px;
+  padding: 1px 8px;
+}
+
+.button.ghost {
+  background: transparent;
+  border-color: transparent;
+  padding: 2px 8px;
+}
+
+/* Progress and event log */
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-small);
+  text-align: center;
+}
+
+.event-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.event-log li {
+  display: grid;
+  grid-template-columns: 88px max-content 1fr;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+}
+
+.event-log time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Error banners */
+.banners {
+  width: min(960px, 100%);
+  margin: 16px auto 0;
+  padding: 0 28px;
+  display: grid;
+  gap: 8px;
+}
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-small);
+  border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+  background: var(--error-surface);
+}
+
+.banner-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.banner-body strong {
+  color: var(--error);
+}
+
+.banner-detail {
+  overflow-wrap: anywhere;
+}
+
+/* Full-window error (ErrorBoundary) */
+.fatal {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.fatal-card {
+  width: min(640px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  display: grid;
+  gap: 12px;
+}
+
+.fatal-card h1 {
+  font-size: 20px;
+  color: var(--error);
+}
+
+.fatal-card p {
+  margin: 0;
+}
+
+.detail {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font-mono);
+  user-select: text;
+}

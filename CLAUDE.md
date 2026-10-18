@@ -16,19 +16,20 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 **Phase 0: Project setup** is complete and approved (2026-10-17).
 
-**Current: Phase 1: Explore the Chrome extension** at `C:\Users\LENOVO\Documents\JS\myNotionNotes`, on the branch `phase-1-explore-extension`.
+**Phase 1: Explore the Chrome extension** is complete and approved (2026-10-18, PR #1). Its output is `docs/extension-notes.md` and the auth design in `PLAN.md` section 12.
 
-- Read the extension. **Do not modify, build or run anything in it,** and never copy tokens or secrets from it into notes, logs or commits; mask any you find and tell the user where they are.
-- Write `docs/extension-notes.md`. It should cover:
-  - the auth flow, including how tokens are obtained, stored and refreshed, and whether a client secret or backend is involved;
-  - every Notion API endpoint it calls, with the `Notion-Version` header used;
-  - its pagination, rate-limit, retry and error handling;
-  - how it reads property values (dates, titles, relations, numbers, unique IDs), especially time zones;
-  - which pieces are worth porting to Python, and what must not be copied.
-- Propose an auth design for the desktop app against `PLAN.md` section 12: compare the options and recommend one.
-- Open a pull request, summarize, and wait for the user's approval. **Do not start Phase 2.**
+**Current: Phase 2: Scaffold**, on the branch `phase-2-scaffold`.
 
-**Next: Phase 2: Scaffold** (see `PLAN.md` section 15).
+- Back end: Python 3.12 project managed with `uv`, using the `app/` layout in `PLAN.md` section 14, with ruff and pytest configured.
+- Front end: React + TypeScript (strict) + Vite in `ui/`, with ECharts and TanStack Table installed.
+- Desktop shell: a pywebview window with the JS bridge, in dev mode (Vite dev server, hot reload) and normal mode (built `ui/dist`). The UI calls a Python method and shows the result, and Python pushes events to the UI.
+- `%APPDATA%\HabitTracker\` paths (database, logs), created on first run.
+- The SQLite schema from `PLAN.md` section 11 with versioned migrations, tested on a new database and on re-runs.
+- Rotating logs that never contain tokens or secrets (tested), and readable in-window error messages instead of crashes or blank screens.
+- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks and Dependabot. No branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
+- Fill in the Commands section below, record decisions in `PLAN.md`, open a pull request, and wait for the user's approval. **Do not start Phase 3.**
+
+**Next: Phase 3: Connect** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
@@ -62,4 +63,50 @@ Update this section whenever a new phase begins.
 
 ## Commands
 
-To be filled in during Phase 2, covering how to install dependencies, run in development mode, run the tests, and build the installer.
+PowerShell, from the repository root. The installer build arrives in Phase 8.
+
+**Install** (once per clone, and after dependency changes):
+
+```powershell
+uv sync                       # Python 3.12 venv in .venv, from uv.lock
+npm --prefix ui ci            # UI packages, from ui/package-lock.json
+uv run pre-commit install     # git hook: lint, format, type check, secret scan on commit
+```
+
+**Run:**
+
+```powershell
+uv run habit-tracker --dev            # dev mode: starts (or reuses) the Vite dev server, hot reload, inspector, diagnostics
+npm --prefix ui run build             # build ui/dist, needed before normal mode
+uv run habit-tracker                  # normal mode: loads ui/dist over file://
+uv run habit-tracker --diagnostics    # normal mode with the diagnostics panel
+uv run habit-tracker --self-check     # start up without a window, print a JSON report
+```
+
+- `npm --prefix ui run dev` starts Vite on its own; `--dev` then reuses it.
+- `$env:HABIT_TRACKER_HOME = "C:\some\folder"` points the app at a different data folder than `%APPDATA%\HabitTracker` (for example a throwaway copy); `Remove-Item Env:HABIT_TRACKER_HOME` to undo.
+
+**Test:**
+
+```powershell
+uv run pytest                 # back-end tests (excludes the window tests)
+uv run pytest -m gui          # end-to-end tests that open the real window; build the UI first
+uv run pytest --cov           # with coverage
+npm --prefix ui test          # UI tests (Vitest)
+```
+
+**Lint, format and type check:**
+
+```powershell
+uv run ruff check             # add --fix to apply fixes
+uv run ruff format            # add --check to only report
+uv run mypy
+npm --prefix ui run lint
+npm --prefix ui run format    # format:check to only report
+npm --prefix ui run typecheck
+uv run pre-commit run --all-files   # every hook, as CI runs them
+```
+
+**Build the UI:** `npm --prefix ui run build` type-checks, then writes the single-file bundle to `ui/dist/index.html`.
+
+**Database migrations:** add `app/db/migrations/NNNN_short_name.sql` with the next number. Never edit a migration that is on `main`.

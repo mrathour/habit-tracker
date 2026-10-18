@@ -1,0 +1,4 @@
+# Fake test tokens committed before they were marked "gitleaks:allow" (Phase 2, commit 847cb4a).
+# Fingerprints are commit-specific, so these lines cover only that commit.
+847cb4aa062ebc08edb70df66a72c4733d8c60c5:tests/test_redaction.py:generic-api-key:31
+847cb4aa062ebc08edb70df66a72c4733d8c60c5:tests/test_logging.py:generic-api-key:22
