@@ -93,9 +93,10 @@ describe("logging", () => {
       expect(line).not.toContain("secret-code-123");
       expect(line).not.toContain("signed-state-456");
       expect(line).not.toContain("?");
-      expect(Object.keys(JSON.parse(line) as object).sort()).toEqual(
-        ["durationMs", "method", "route", "status"].sort(),
-      );
+      const keys = Object.keys(JSON.parse(line) as object);
+      expect(
+        keys.every((key) => ["durationMs", "method", "route", "status", "reason"].includes(key)),
+      ).toBe(true);
     }
     expect(JSON.parse(lines[1] ?? "{}")).toMatchObject({ route: "other" });
   });

@@ -574,3 +574,11 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Phase 3: Cloudflare's automatic invocation logs are off for the Worker, because they record full request URLs (Notion's code and the state on `/callback`). Only the Worker's own lines (route, method, status, duration) are kept (12.2). |
 | 2026-10-18 | Phase 3: the public pages' wording follows what the app does for each way of connecting, including that a personal access token has the creator's full access, though the app sends only read requests. Terms are governed by the laws of India, with the courts at New Delhi having jurisdiction. The privacy policy keeps the "not aimed at children under 13" line and dates from the first deploy. |
 | 2026-10-18 | Phase 3: the privacy policy promises notice of data-handling changes. Notices ship only inside app updates, shown on the first launch of the new version, and the app never contacts the website for them. Tracked as a Phase 8 requirement (13, 15), with a new `acknowledged_policy_version` setting (11). |
+| 2026-10-18 | Phase 3 token service details (`docs/handoff-protocol.md`):
+- **Errors are encrypted too.** The Worker returns every sign-in outcome, including cancel, access denied and Notion errors, in the encrypted envelope, so the app reacts at once instead of waiting for its 5-minute timeout.
+- **Clock correction.** `/start` returns `server_time`, which corrects the app's expiry check for a wrong PC clock.
+- **Origin requests refused.** `POST` routes refuse requests that carry an `Origin` header, so a web page can't drive them.
+- **Bodies capped.** Request bodies are limited to 4 KB.
+- **Redirect URI.** It is the Worker's own origin + `/callback`.
+- **Rate limits per IP.** OAuth routes allow 20 requests a minute, and pages 120.
+- **Deploy guard.** `npm run deploy` refuses while any page placeholder is unfilled, and runs the tests first. |

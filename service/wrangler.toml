@@ -24,3 +24,15 @@ head_sampling_rate = 1
 # The Notion OAuth client ID is public. It's set once the Notion connection exists.
 NOTION_CLIENT_ID = ""
 NOTION_API_BASE = "https://api.notion.com"
+
+# Per-IP rate limits (PLAN.md 12.2), counted over one minute and not kept beyond it.
+# namespace_id is an arbitrary integer that names the counter; it isn't a secret.
+[[ratelimits]]
+name = "OAUTH_LIMITER"
+namespace_id = "2001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "PAGE_LIMITER"
+namespace_id = "2002"
+simple = { limit = 120, period = 60 }

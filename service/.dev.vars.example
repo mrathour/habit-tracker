@@ -1,0 +1,5 @@
+# Copy to .dev.vars for `wrangler dev` (git ignores .dev.vars). These are deliberately fake,
+# development-only values. The real secrets exist only in Cloudflare (docs/token-service.md).
+NOTION_CLIENT_SECRET=dev-only-not-a-real-secret
+# 32 zero bytes, base64url: obviously fake, but the right shape.
+STATE_SIGNING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA

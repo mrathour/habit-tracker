@@ -3,20 +3,38 @@
  *
  * - `GET /`, `/privacy`, `/terms`, `/support`: static pages for Notion's developer portal.
  * - `GET /health`: liveness check.
- * - `POST /start`, `GET /callback`, `POST /refresh`, `POST /revoke`: the OAuth routes (step 3).
+ * - `POST /start`, `GET /callback`, `POST /refresh`, `POST /revoke`: the OAuth routes
+ *   (src/oauth.ts, docs/handoff-protocol.md).
  *
- * It stores nothing and logs only the route, status and duration (src/log.ts).
+ * It stores nothing and logs only the route, method, status, duration and a short reason
+ * (src/log.ts).
  */
 
 import { logRequest, routeLabel } from "./log.ts";
-import { PAGES, renderPage, STYLESHEET, STYLESHEET_PATH } from "./pages.ts";
+import {
+  callback,
+  type Deps,
+  errorJson,
+  json,
+  type Outcome,
+  refresh,
+  revoke,
+  start,
+} from "./oauth.ts";
+import { htmlResponse, PAGES, renderPage, STYLESHEET, STYLESHEET_PATH } from "./pages.ts";
 
-const OAUTH_ROUTES = ["/start", "/callback", "/refresh", "/revoke"] as const;
+const OAUTH_ROUTES = {
+  "/start": start,
+  "/callback": callback,
+  "/refresh": refresh,
+  "/revoke": revoke,
+} as const;
+
 const KNOWN_ROUTES: ReadonlySet<string> = new Set([
   ...Object.keys(PAGES),
   STYLESHEET_PATH,
   "/health",
-  ...OAUTH_ROUTES,
+  ...Object.keys(OAUTH_ROUTES),
 ]);
 
 /** Sent on every response (PLAN.md 12.2). */
@@ -27,10 +45,6 @@ const COMMON_HEADERS: Readonly<Record<string, string>> = {
   "Strict-Transport-Security": "max-age=31536000",
 };
 
-/** Pages have no scripts, forms or third-party content. */
-const PAGE_CSP =
-  "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-
 function withHeaders(response: Response): Response {
   const result = new Response(response.body, response);
   for (const [name, value] of Object.entries(COMMON_HEADERS)) {
@@ -39,68 +53,76 @@ function withHeaders(response: Response): Response {
   return result;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-  });
+function isOAuthRoute(pathname: string): pathname is keyof typeof OAUTH_ROUTES {
+  return Object.hasOwn(OAUTH_ROUTES, pathname);
 }
 
-function errorJson(status: number, error: string, message: string): Response {
-  return json({ error, message }, status);
+async function rateLimited(request: Request, limiter: RateLimit): Promise<boolean> {
+  // Cloudflare sets CF-Connecting-IP on every request; the counter is keyed by it only.
+  const key = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const { success } = await limiter.limit({ key });
+  return !success;
 }
 
-function route(request: Request): Response {
-  const url = new URL(request.url);
-  const { pathname } = url;
+async function route(request: Request, env: Env, deps: Deps): Promise<Outcome> {
+  const { pathname } = new URL(request.url);
+
+  if (isOAuthRoute(pathname)) {
+    if (await rateLimited(request, env.OAUTH_LIMITER)) {
+      return errorJson(429, "rate_limited", "Too many requests. Wait a minute and try again.");
+    }
+    return OAUTH_ROUTES[pathname](request, env, deps);
+  }
 
   const page = PAGES[pathname];
-  if (page !== undefined || pathname === STYLESHEET_PATH || pathname === "/health") {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return errorJson(405, "method_not_allowed", "Use GET.");
-    }
+  const isStatic = page !== undefined || pathname === STYLESHEET_PATH || pathname === "/health";
+  if (!isStatic) return errorJson(404, "not_found", "Not found.");
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return errorJson(405, "method_not_allowed", "Use GET.");
   }
-
-  if (page !== undefined) {
-    return new Response(renderPage(page), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Security-Policy": PAGE_CSP,
-      },
-    });
+  if (await rateLimited(request, env.PAGE_LIMITER)) {
+    return errorJson(429, "rate_limited", "Too many requests. Wait a minute and try again.");
   }
+  if (page !== undefined) return { response: htmlResponse(renderPage(page)) };
   if (pathname === STYLESHEET_PATH) {
-    return new Response(STYLESHEET, { headers: { "Content-Type": "text/css; charset=utf-8" } });
+    return {
+      response: new Response(STYLESHEET, {
+        headers: { "Content-Type": "text/css; charset=utf-8" },
+      }),
+    };
   }
-  if (pathname === "/health") {
-    return json({ status: "ok" });
-  }
-  if ((OAUTH_ROUTES as readonly string[]).includes(pathname)) {
-    return errorJson(501, "not_implemented", "This route isn't available yet.");
-  }
-  return errorJson(404, "not_found", "Not found.");
+  return { response: json({ status: "ok" }) };
 }
 
-export default {
-  fetch(request): Response {
+/** Build the Worker's fetch handler. Tests pass their own `fetch` and clock. */
+export function createHandler(deps: Deps) {
+  return async (request: Request, env: Env): Promise<Response> => {
     const started = Date.now();
-    let response: Response;
-    let reason: string | undefined;
+    let outcome: Outcome;
     try {
-      response = route(request);
+      outcome = await route(request, env, deps);
     } catch {
       // Never include the error itself: it could carry request data.
-      reason = "unhandled_exception";
-      response = errorJson(500, "internal_error", "Something went wrong. Please try again.");
+      outcome = errorJson(500, "internal_error", "Something went wrong. Please try again.");
+      outcome.reason = "unhandled_exception";
     }
-    const final = withHeaders(response);
+    const response = withHeaders(outcome.response);
     logRequest({
       route: routeLabel(new URL(request.url).pathname, KNOWN_ROUTES),
       method: request.method,
-      status: final.status,
+      status: response.status,
       durationMs: Date.now() - started,
-      ...(reason === undefined ? {} : { reason }),
+      ...(outcome.reason === undefined ? {} : { reason: outcome.reason }),
     });
-    return final;
-  },
+    return response;
+  };
+}
+
+const handle = createHandler({
+  fetch: (input, init) => fetch(input, init),
+  now: () => Math.floor(Date.now() / 1000),
+});
+
+export default {
+  fetch: (request, env) => handle(request, env),
 } satisfies ExportedHandler<Env>;

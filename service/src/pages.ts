@@ -59,3 +59,29 @@ ${fillValues(page.body)}
 </html>
 `;
 }
+
+/** Pages have no scripts, forms or third-party content. */
+export const PAGE_CSP =
+  "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+/** Escapes text placed in element content (never in attributes). */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function htmlResponse(html: string, status = 200): Response {
+  return new Response(html, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": PAGE_CSP },
+  });
+}
+
+/** A browser-facing error, for problems the app can't be told about. */
+export function errorPage(status: number, title: string, message: string): Response {
+  const body = `<h1>${escapeHtml(title)}</h1>\n<p class="lead">${escapeHtml(message)}</p>\n<p class="links"><a href="/support">Get help</a></p>`;
+  return htmlResponse(renderPage({ title: `${escapeHtml(title)} · Habit Tracker`, body }), status);
+}
