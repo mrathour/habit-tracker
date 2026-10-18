@@ -26,7 +26,7 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 - `%APPDATA%\HabitTracker\` paths (database, logs), created on first run.
 - The SQLite schema from `PLAN.md` section 11 with versioned migrations, tested on a new database and on re-runs.
 - Rotating logs that never contain tokens or secrets (tested), and readable in-window error messages instead of crashes or blank screens.
-- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks, Dependabot, and `main` branch protection if the GitHub plan allows it.
+- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks and Dependabot. No branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
 - Fill in the Commands section below, record decisions in `PLAN.md`, open a pull request, and wait for the user's approval. **Do not start Phase 3.**
 
 **Next: Phase 3: Connect** (see `PLAN.md` section 15).

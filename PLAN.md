@@ -497,7 +497,7 @@ After installing, open a new terminal so the updated PATH is picked up, then re-
 - **Milestones:** one per phase, 1 to 8.
 - **Pull requests:** allow squash merge only, and delete branches automatically after merging.
 - **Security:** enable Dependabot alerts, plus secret scanning and push protection where your GitHub plan offers them.
-- **Branch protection:** where your plan supports it, protect `main` so CI must pass before merging. Phase 2 checked this: GitHub refuses both branch protection and rulesets on this private repository on the Free plan. Until the repository is public or the plan is upgraded, the rule "merge only after CI passes and the user approves" is followed by hand (see Open items, and `docs/setup.md` for the settings to apply).
+- **Branch protection:** not used (decided in Phase 2). GitHub offers it for this private repository only with GitHub Pro, which the user declined. Instead, a manual rule applies: a pull request is merged only after CI passes and the user gives explicit approval.
 
 Phase 0 is the only phase committed directly to `main`.
 
@@ -520,7 +520,6 @@ Phase 0 is the only phase committed directly to `main`.
 - Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
-- Branch protection on `main`: unavailable for this private repository on the current GitHub plan (checked in Phase 2). Apply the settings in `docs/setup.md` when the repository becomes public (free there) or the plan is upgraded. Until then, pull requests are merged only after CI passes and the user approves.
 
 ## 17. Decisions log
 
@@ -558,5 +557,9 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Phase 2: TypeScript is pinned to 6.0.x, because typescript-eslint (type-checked linting) supports only TypeScript below 6.1 and TypeScript 7 is current. Dependabot ignores TypeScript ≥ 6.1 until that changes. Also: ESLint, Prettier and Vitest for the UI, and `mypy --strict` for Python. |
 | 2026-10-18 | Phase 2: schema migrations are numbered SQL files recorded in `schema_migrations` with checksums and mirrored in `PRAGMA user_version`. The `schema_version` key is removed from `settings` (11). Tables are `STRICT`, with `CHECK` constraints for UTC timestamps and JSON shapes. |
 | 2026-10-18 | Phase 2: Python methods return an ok/error envelope with logged, redacted error reports and short error IDs. Python pushes events as DOM events, buffered until the UI is ready. Dev mode starts or reuses the Vite dev server. `HABIT_TRACKER_HOME` overrides the data folder. `--diagnostics` and `--self-check` are added (10). |
-| 2026-10-18 | Phase 2: branch protection and rulesets for `main` are unavailable on this private repo on the current GitHub plan ("Upgrade to GitHub Pro or make this repository public"). The intended settings are recorded in `docs/setup.md`, to apply later. Meanwhile, merging only after green CI and the user's approval is a manual rule. |
+| 2026-10-18 | Phase 2: branch protection and rulesets for `main` are unavailable on this private repo on the current GitHub plan ("Upgrade to GitHub Pro or make this repository public"). |
 | 2026-10-18 | Phase 2: GitHub secret scanning is unavailable on this private repo, so gitleaks scans staged changes in pre-commit and the full history in CI. CI actions are pinned to commit SHAs. End-to-end tests drive the real window in CI (`pytest -m gui`). |
+| 2026-10-18 | Phase 2 review: approved removing the `schema_version` key from `settings`. The local schema version lives only in the migration system (11). |
+| 2026-10-18 | Phase 2 review: approved pinning TypeScript to 6.0.x until typescript-eslint supports TypeScript 7 (10). |
+| 2026-10-18 | Phase 2 review: Node.js moves to Scoop (`nodejs-lts`, 24.22.0), replacing the nodejs.org install in `C:\Program Files\nodejs`, so every tool now comes from Scoop. `.node-version` pins CI to the same exact version, and `ui/package.json` `engines` requires `>=24.22.0` (enforced by `engine-strict` in `ui/.npmrc`). jsdom is upgraded to 30, which needs Node 24.15 or later. |
+| 2026-10-18 | Phase 2 review: no branch protection on `main`, and no GitHub Pro upgrade for it. The manual rule stays: never merge a pull request without the user's explicit approval, and only with CI passing. This supersedes the plan to apply branch protection later. |
