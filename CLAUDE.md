@@ -18,18 +18,11 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 **Phase 1: Explore the Chrome extension** is complete and approved (2026-10-18, PR #1). Its output is `docs/extension-notes.md` and the auth design in `PLAN.md` section 12.
 
-**Current: Phase 2: Scaffold**, on the branch `phase-2-scaffold`.
+**Phase 2: Scaffold** is complete and approved (2026-10-18, PR #2). It delivered the uv Python project, the React + TypeScript + Vite UI, the pywebview window and JS bridge (dev and normal modes), `%APPDATA%\HabitTracker\` paths, the SQLite schema with versioned migrations, redacting rotating logs, in-window error handling, and CI, pre-commit and Dependabot. There is no branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
 
-- Back end: Python 3.12 project managed with `uv`, using the `app/` layout in `PLAN.md` section 14, with ruff and pytest configured.
-- Front end: React + TypeScript (strict) + Vite in `ui/`, with ECharts and TanStack Table installed.
-- Desktop shell: a pywebview window with the JS bridge, in dev mode (Vite dev server, hot reload) and normal mode (built `ui/dist`). The UI calls a Python method and shows the result, and Python pushes events to the UI.
-- `%APPDATA%\HabitTracker\` paths (database, logs), created on first run.
-- The SQLite schema from `PLAN.md` section 11 with versioned migrations, tested on a new database and on re-runs.
-- Rotating logs that never contain tokens or secrets (tested), and readable in-window error messages instead of crashes or blank screens.
-- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks and Dependabot. No branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
-- Fill in the Commands section below, record decisions in `PLAN.md`, open a pull request, and wait for the user's approval. **Do not start Phase 3.**
+**Current: Phase 3: Connect**, on the branch `phase-3-connect`. Scope and "Done when" are in `PLAN.md` section 15, with the auth design in section 12. Work has not started yet: wait for the user's Phase 3 instructions, then restate what you'll build and how it will be checked.
 
-**Next: Phase 3: Connect** (see `PLAN.md` section 15).
+**Next: Phase 4: Map** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
