@@ -14,7 +14,7 @@ FG = (255, 255, 255)
 RADIUS = 104
 
 
-def inside_rounded(x, y):
+def inside_rounded(x: int, y: int) -> bool:
     cx = min(max(x, RADIUS), N - 1 - RADIUS)
     cy = min(max(y, RADIUS), N - 1 - RADIUS)
     return (x - cx) ** 2 + (y - cy) ** 2 <= RADIUS**2
@@ -28,7 +28,7 @@ for i, h in enumerate([96, 152, 120, 208, 272]):
     bars.append((x0, base - h, x0 + width, base))
 
 
-def in_bar(x, y):
+def in_bar(x: int, y: int) -> bool:
     for x0, y0, x1, y1 in bars:
         if x0 <= x < x1 and y0 <= y < y1:
             # round the top corners of each bar
@@ -52,7 +52,7 @@ for y in range(N):
             rows += bytes((*BG, 255))
 
 
-def chunk(kind, data):
+def chunk(kind: bytes, data: bytes) -> bytes:
     return (
         struct.pack(">I", len(data))
         + kind
