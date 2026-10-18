@@ -7,7 +7,10 @@ workers_dev = true
 preview_urls = false
 
 # Text modules: the static pages are bundled with the Worker.
-rules = [{ type = "Text", globs = ["**/*.html", "**/*.css", "**/*.txt"], fallthrough = true }]
+rules = [
+  { type = "Text", globs = ["**/*.html", "**/*.css", "**/*.txt"], fallthrough = true },
+  { type = "Data", globs = ["**/*.png"], fallthrough = true },
+]
 
 [observability]
 enabled = true

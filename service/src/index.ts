@@ -21,7 +21,15 @@ import {
   revoke,
   start,
 } from "./oauth.ts";
-import { htmlResponse, PAGES, renderPage, STYLESHEET, STYLESHEET_PATH } from "./pages.ts";
+import {
+  htmlResponse,
+  ICON,
+  ICON_PATH,
+  PAGES,
+  renderPage,
+  STYLESHEET,
+  STYLESHEET_PATH,
+} from "./pages.ts";
 
 const OAUTH_ROUTES = {
   "/start": start,
@@ -33,6 +41,7 @@ const OAUTH_ROUTES = {
 const KNOWN_ROUTES: ReadonlySet<string> = new Set([
   ...Object.keys(PAGES),
   STYLESHEET_PATH,
+  ICON_PATH,
   "/health",
   ...Object.keys(OAUTH_ROUTES),
 ]);
@@ -75,7 +84,11 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Outcome> {
   }
 
   const page = PAGES[pathname];
-  const isStatic = page !== undefined || pathname === STYLESHEET_PATH || pathname === "/health";
+  const isStatic =
+    page !== undefined ||
+    pathname === STYLESHEET_PATH ||
+    pathname === ICON_PATH ||
+    pathname === "/health";
   if (!isStatic) return errorJson(404, "not_found", "Not found.");
   if (request.method !== "GET" && request.method !== "HEAD") {
     return errorJson(405, "method_not_allowed", "Use GET.");
@@ -90,6 +103,9 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Outcome> {
         headers: { "Content-Type": "text/css; charset=utf-8" },
       }),
     };
+  }
+  if (pathname === ICON_PATH) {
+    return { response: new Response(ICON, { headers: { "Content-Type": "image/png" } }) };
   }
   return { response: json({ status: "ok" }) };
 }

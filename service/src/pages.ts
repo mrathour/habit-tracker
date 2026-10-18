@@ -1,4 +1,5 @@
 import home from "../pages/home.html";
+import icon from "../pages/icon.png";
 import privacy from "../pages/privacy.html";
 import styles from "../pages/style.css";
 import support from "../pages/support.html";
@@ -29,6 +30,8 @@ export const PAGES: Readonly<Record<string, Page>> = {
 };
 
 export const STYLESHEET_PATH = "/style.css";
+export const ICON_PATH = "/icon.png";
+export const ICON = icon;
 export const STYLESHEET = styles;
 
 function fillValues(html: string): string {
@@ -49,6 +52,7 @@ export function renderPage(page: Page): string {
 <meta name="color-scheme" content="light dark">
 <title>${page.title}</title>
 <link rel="stylesheet" href="${STYLESHEET_PATH}">
+<link rel="icon" type="image/png" href="${ICON_PATH}">
 </head>
 <body>
 ${NAV}

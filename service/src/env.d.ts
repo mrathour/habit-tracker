@@ -1,3 +1,8 @@
+declare module "*.png" {
+  const data: ArrayBuffer;
+  export default data;
+}
+
 // Secrets set with `wrangler secret put` (docs/token-service.md). `wrangler types` only sees
 // [vars], so these are declared here, merged into both Env declarations it generates. Both are
 // optional at the type level: a Worker without them answers "not configured" instead of failing.

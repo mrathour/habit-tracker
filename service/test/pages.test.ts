@@ -101,3 +101,16 @@ describe("logging", () => {
     expect(JSON.parse(lines[1] ?? "{}")).toMatchObject({ route: "other" });
   });
 });
+
+describe("/icon.png", () => {
+  it("serves the app icon, linked from every page", async () => {
+    const response = await get("/icon.png");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect([...bytes.slice(1, 4)].map((b) => String.fromCharCode(b)).join("")).toBe("PNG");
+    expect(await (await get("/")).text()).toContain(
+      '<link rel="icon" type="image/png" href="/icon.png">',
+    );
+  });
+});
