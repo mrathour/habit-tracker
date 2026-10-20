@@ -523,7 +523,6 @@ Phase 0 is the only phase committed directly to `main`.
 ## 16. Open items
 
 - License: undecided. It must be chosen before the repository or app is shared publicly.
-- Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
@@ -582,3 +581,4 @@ Phase 0 is the only phase committed directly to `main`.
 - **Redirect URI.** It is the Worker's own origin + `/callback`.
 - **Rate limits per IP.** OAuth routes allow 20 requests a minute, and pages 120.
 - **Deploy guard.** `npm run deploy` refuses while any page placeholder is unfilled, and runs the tests first. |
+| 2026-10-20 | Phase 3: confirmed live that the unreviewed "Habit Tracker" public connection signs in through the deployed token service (`https://habit-tracker.mrathour.workers.dev`), and that the hand-off and revoke work. No Notion review is needed for v1; review applies only to a Marketplace listing, which stays out of scope. The open item about the review is closed. |
