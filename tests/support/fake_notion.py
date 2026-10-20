@@ -52,6 +52,8 @@ class FakeNotion:
     data_sources: dict[str, FakeDataSource] = field(default_factory=dict)
     #: Hidden from search (not shared with the integration).
     unshared: set[str] = field(default_factory=set)
+    #: Databases whose own object can't be read, though their data sources can.
+    unreadable_databases: set[str] = field(default_factory=set)
     page_size: int = 100
     #: Queue of forced responses for the next requests, e.g. a 503 or a network error.
     next_failures: list[httpx.Response | Exception] = field(default_factory=list)
@@ -134,7 +136,7 @@ class FakeNotion:
             return self._search(json.loads(request.content or b"{}"))
         if match := re.fullmatch(r"/v1/databases/([^/]+)", path):
             database = self.databases.get(match[1])
-            if database is None or database.id in self.unshared:
+            if database is None or database.id in self.unshared | self.unreadable_databases:
                 return notion_error(404, "object_not_found")
             return httpx.Response(200, json=self.database_json(database))
         if match := re.fullmatch(r"/v1/data_sources/([^/]+)", path):

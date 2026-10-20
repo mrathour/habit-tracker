@@ -18,7 +18,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, Literal, Protocol, TypedDict
+from typing import TYPE_CHECKING, Final, Literal, Protocol, TypedDict
+from urllib.parse import urlsplit
 
 from app import APP_NAME, __version__
 from app.bridge import bridge_method
@@ -26,6 +27,9 @@ from app.db import Database
 from app.errors import AppError, new_error_id
 from app.events import EventChannel
 from app.paths import AppPaths
+
+if TYPE_CHECKING:
+    from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +80,8 @@ class AppContext:
     window: WindowControl | None = None
     on_ui_ready: Callable[[], None] | None = None
     open_folder: Callable[[Path], None] = field(default=lambda path: _open_in_explorer(path))
+    connection: ConnectionService | None = None
+    open_url: Callable[[str], object] = field(default=lambda url: _open_in_browser(url))
 
 
 class Api:
@@ -182,9 +188,79 @@ class Api:
         if self._ctx.window is not None:
             self._ctx.window.destroy()
 
+    # --- Notion connection (PLAN.md 12) -------------------------------------------------
+
+    def _connection(self) -> ConnectionService:
+        if self._ctx.connection is None:
+            raise AppError("The Notion connection isn't available because the app didn't start.")
+        return self._ctx.connection
+
+    @bridge_method
+    def get_connection(self) -> ConnectionInfo:
+        return self._connection().info()
+
+    @bridge_method
+    def connect_with_token(self, kind: object, token: object) -> ConnectionInfo:
+        """Validate a pasted token with Notion, then store it. Nothing is stored on failure."""
+        return self._connection().connect_with_token(kind, token)
+
+    @bridge_method
+    def start_sign_in(self) -> dict[str, object]:
+        """Open Notion's consent page; the outcome arrives as connect:* events."""
+        return self._connection().start_sign_in()
+
+    @bridge_method
+    def cancel_sign_in(self) -> None:
+        self._connection().cancel_sign_in()
+
+    @bridge_method
+    def logout(self, clear_local_data: object) -> dict[str, object]:
+        return self._connection().logout(clear_local_data)
+
+    @bridge_method
+    def list_data_sources(self, cursor: object = None) -> DataSourcePage:
+        return self._connection().list_data_sources(cursor)
+
+    @bridge_method
+    def choose_data_source(
+        self, database_id: object, data_source_id: object, confirm_replace: object = False
+    ) -> ConnectionInfo:
+        return self._connection().choose_data_source(database_id, data_source_id, confirm_replace)
+
+    @bridge_method
+    def open_external(self, url: object) -> None:
+        """Open a help or Notion link in the default browser. Only known HTTPS sites."""
+        if not isinstance(url, str) or not _is_allowed_external(url):
+            raise AppError("That link can't be opened.")
+        self._ctx.open_url(url)
+
 
 def _open_in_explorer(path: Path) -> None:
     os.startfile(path)  # noqa: S606 - opens a folder the app owns in Explorer
+
+
+ALLOWED_EXTERNAL_HOSTS: Final = frozenset(
+    {
+        "habit-tracker.mrathour.workers.dev",
+        "www.notion.so",
+        "notion.so",
+        "www.notion.com",
+        "notion.com",
+        "app.notion.com",
+        "developers.notion.com",
+    }
+)
+
+
+def _is_allowed_external(url: str) -> bool:
+    parts = urlsplit(url)
+    return parts.scheme == "https" and parts.hostname in ALLOWED_EXTERNAL_HOSTS
+
+
+def _open_in_browser(url: str) -> None:
+    import webbrowser
+
+    webbrowser.open(url)
 
 
 def _clip(value: object, limit: int) -> str | None:

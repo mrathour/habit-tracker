@@ -18,7 +18,7 @@ import logging
 import threading
 from dataclasses import replace
 
-from app.notion.credentials import CredentialStore, StoredCredential, utc_now
+from app.notion.credentials import CredentialBackend, StoredCredential, utc_now
 from app.notion.errors import NotConnectedError, PasteNewTokenError
 from app.notion.service_client import TokenServiceClient
 from app.redaction import Secret
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class TokenManager:
-    def __init__(self, store: CredentialStore, service: TokenServiceClient) -> None:
+    def __init__(self, store: CredentialBackend, service: TokenServiceClient) -> None:
         self._store = store
         self._service = service
         self._lock = threading.Lock()

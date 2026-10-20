@@ -32,6 +32,9 @@ from app.redaction import Secret
 logger = logging.getLogger(__name__)
 
 NOTION_VERSION: Final = "2026-03-11"
+DEFAULT_NOTION_URL: Final = "https://api.notion.com"
+#: Overrides the Notion API address, for the end-to-end tests' fake Notion.
+NOTION_URL_ENV_VAR: Final = "HABIT_TRACKER_NOTION_URL"
 REQUEST_TIMEOUT_MS: Final = 30_000
 REQUESTS_PER_SECOND: Final = 3.0
 #: Extra attempts for 5xx on read-only POSTs (notion-client already retries GETs).
@@ -72,7 +75,7 @@ class NotionReader:
         tokens: TokenManager,
         *,
         http: httpx.Client | None = None,
-        base_url: str = "https://api.notion.com",
+        base_url: str = DEFAULT_NOTION_URL,
         limiter: RateLimiter | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:

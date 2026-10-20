@@ -23,6 +23,14 @@ PUBLIC_METHODS = {
     "open_log_folder",
     "raise_test_error",
     "quit",
+    "get_connection",
+    "connect_with_token",
+    "start_sign_in",
+    "cancel_sign_in",
+    "logout",
+    "list_data_sources",
+    "choose_data_source",
+    "open_external",
 }
 
 
@@ -215,3 +223,36 @@ def test_quit_destroys_the_window(app_paths: AppPaths, channel: RecordingChannel
     context.window = window
     api.quit()
     assert window.destroyed
+
+
+def test_connection_methods_need_a_started_app(
+    app_paths: AppPaths, channel: RecordingChannel
+) -> None:
+    api, _ = make_api(app_paths, channel, None)
+    response = api.get_connection()
+    assert response["ok"] is False
+    assert "didn't start" in str(response["error"]["message"])  # type: ignore[typeddict-item]
+
+
+@pytest.mark.parametrize(
+    ("url", "allowed"),
+    [
+        ("https://habit-tracker.mrathour.workers.dev/support", True),
+        ("https://www.notion.so/my-page", True),
+        ("https://developers.notion.com/docs", True),
+        ("http://www.notion.so/insecure", False),
+        ("https://evil.example/phish", False),
+        ("https://notion.so.evil.example/", False),
+        ("javascript:alert(1)", False),
+        ("file:///C:/Windows", False),
+        (42, False),
+    ],
+)
+def test_open_external_only_opens_known_https_sites(
+    app_paths: AppPaths, channel: RecordingChannel, url: object, allowed: bool
+) -> None:
+    opened: list[str] = []
+    api, _ = make_api(app_paths, channel, None, open_url=opened.append)
+    response = api.open_external(url)
+    assert response["ok"] is allowed
+    assert opened == ([url] if allowed else [])

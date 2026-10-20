@@ -15,7 +15,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final, Literal
+from typing import Final, Literal, Protocol
 
 import keyring
 import keyring.errors
@@ -84,6 +84,14 @@ class StoredCredential:
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+class CredentialBackend(Protocol):
+    """What the token manager needs from a store: Credential Manager, or memory for checks."""
+
+    def load(self) -> StoredCredential | None: ...
+    def save(self, credential: StoredCredential) -> None: ...
+    def delete(self) -> None: ...
 
 
 class CredentialStore:
