@@ -32,6 +32,7 @@ from app.errors import AppError, ErrorReport, install_excepthooks, report_except
 from app.events import EventChannel
 from app.log import adopt_pywebview_logger, configure_logging
 from app.paths import AppPaths, resource_root, ui_dist_dir
+from app.single_instance import SingleInstance, bring_existing_window_to_front
 
 logger = logging.getLogger(__name__)
 
@@ -291,16 +292,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.self_check:
         return self_check(args, paths, log_file)
 
-    try:
-        return run_window(args, paths)
-    except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing
-        report = report_exception(exc, context="the window")
-        show_fatal_message(
-            f"{APP_NAME} couldn't open its window.\n\n{report.detail or report.message}\n\n"
-            f"Error ID {report.id}. Details are in the log folder:\n{paths.logs_dir}\n\n"
-            "If this keeps happening, check that the Microsoft Edge WebView2 Runtime is installed."
-        )
-        return 1
+    with SingleInstance(paths.instance_lock_name) as instance:
+        if instance.already_running:
+            logger.info("Habit Tracker is already running; bringing its window to the front")
+            if not bring_existing_window_to_front(APP_NAME):
+                show_fatal_message(f"{APP_NAME} is already running.")
+            return 0
+        try:
+            return run_window(args, paths)
+        except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing
+            report = report_exception(exc, context="the window")
+            show_fatal_message(
+                f"{APP_NAME} couldn't open its window.\n\n{report.detail or report.message}\n\n"
+                f"Error ID {report.id}. Details are in the log folder:\n{paths.logs_dir}\n\n"
+                "If this keeps happening, check that the Microsoft Edge WebView2 Runtime is "
+                "installed."
+            )
+            return 1
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ Settings are rows in the database's ``settings`` table (PLAN.md 11), not a separ
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from dataclasses import dataclass
@@ -22,6 +23,9 @@ HOME_ENV_VAR = "HABIT_TRACKER_HOME"
 @dataclass(frozen=True, slots=True)
 class AppPaths:
     root: Path
+    #: Empty for the real data folder. For an overridden folder, a short hash of its path, so
+    #: that copy gets its own Credential Manager entry and single-instance lock.
+    instance_id: str = ""
 
     @property
     def database(self) -> Path:
@@ -31,12 +35,23 @@ class AppPaths:
     def logs_dir(self) -> Path:
         return self.root / LOG_DIR_NAME
 
+    @property
+    def credential_account(self) -> str:
+        return f"notion-{self.instance_id}" if self.instance_id else "notion"
+
+    @property
+    def instance_lock_name(self) -> str:
+        suffix = f"-{self.instance_id}" if self.instance_id else ""
+        return f"Local\\HabitTracker{suffix}"
+
     @classmethod
     def resolve(cls, environ: os._Environ[str] | dict[str, str] | None = None) -> AppPaths:
         env = os.environ if environ is None else environ
         override = env.get(HOME_ENV_VAR)
         if override:
-            return cls(Path(override).expanduser().resolve())
+            root = Path(override).expanduser().resolve()
+            digest = hashlib.sha256(str(root).lower().encode("utf-8")).hexdigest()[:12]
+            return cls(root, instance_id=digest)
         appdata = env.get("APPDATA")
         base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
         return cls(base / APP_DIR_NAME)
