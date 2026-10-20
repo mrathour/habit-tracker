@@ -32,11 +32,11 @@ How the public connection behind "Connect to Notion" is set up (`PLAN.md` 12.1).
 
 ## Review and the Marketplace
 
-**Confirmed 2026-10-20: sign-in works without review.** A live test signed in to the author's workspace through the deployed token service, decrypted the hand-off in the app's code, and revoked the token. The connection had not been submitted for review.
+**Confirmed 2026-10-20, for the author's own workspace only: sign-in works without review.** A live test signed in through the deployed token service, decrypted the hand-off in the app's code, and revoked the token. The connection had not been submitted for review. Signing in from a workspace that doesn't own the connection is still unverified; that is Phase 3 check (d).
 
 The redirect URI must match character for character. If it doesn't, Notion's consent page shows "Something went wrong: Missing or invalid redirect_uri".
 
-- **No review needed to sign in.** Notion's docs say a public connection "can be used via its OAuth flow without being listed". Review is for listing on the Notion Marketplace, which is not part of v1.
+- **Review and other workspaces.** Notion's docs say a public connection "can be used via its OAuth flow without being listed". Review is for listing on the Notion Marketplace, which is not part of v1.
 - **The Authorization URL field.** The authorization guide says the field in the Configuration tab "populates after a public connection is submitted for review". The app doesn't need that field: the token service builds the same URL from the client ID.
 - **If Notion refuses sign-in for an unreviewed connection,** submit it for review from the Listings section. Notion says it replies within 5–10 business days by email. The values in the table above are what the listing asks for.
 

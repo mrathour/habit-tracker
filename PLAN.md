@@ -524,6 +524,7 @@ Phase 0 is the only phase committed directly to `main`.
 
 - License: undecided. It must be chosen before the repository or app is shared publicly.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
+- Notion review for other workspaces: sign-in without review is verified only in the author's own workspace (2026-10-20). Phase 3 check (d) signs in from a second Notion account that doesn't own the connection. If Notion blocks it, record what the review requires here and in the Decisions log.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
 ## 17. Decisions log
@@ -581,4 +582,4 @@ Phase 0 is the only phase committed directly to `main`.
 - **Redirect URI.** It is the Worker's own origin + `/callback`.
 - **Rate limits per IP.** OAuth routes allow 20 requests a minute, and pages 120.
 - **Deploy guard.** `npm run deploy` refuses while any page placeholder is unfilled, and runs the tests first. |
-| 2026-10-20 | Phase 3: confirmed live that the unreviewed "Habit Tracker" public connection signs in through the deployed token service (`https://habit-tracker.mrathour.workers.dev`), and that the hand-off and revoke work. No Notion review is needed for v1; review applies only to a Marketplace listing, which stays out of scope. The open item about the review is closed. |
+| 2026-10-20 | Phase 3: confirmed live that the unreviewed "Habit Tracker" public connection signs in through the deployed token service (`https://habit-tracker.mrathour.workers.dev`), and that the hand-off and revoke work. **This is verified only for the author's own workspace, where the author owns the connection.** Whether a workspace the author doesn't own can sign in without review is checked in Phase 3 verification (d). Until (d) passes, "no review needed" is not assumed for other users. |
