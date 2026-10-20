@@ -547,3 +547,24 @@ def test_reconnect_after_logout(harness: Harness) -> None:
 def test_settings_refuse_secret_keys(harness: Harness, key: str) -> None:
     with pytest.raises(ValueError, match="never store secrets"):
         harness.settings.set(key, "x")
+
+
+def test_pasting_a_token_revokes_a_replaced_sign_in(harness: Harness) -> None:
+    old = sign_in(harness)
+    info = harness.service.connect_with_token("pat", harness.notion.issue_token())
+    assert info["auth_kind"] == "pat"
+    assert harness.token_service.revoked == [old]
+
+
+def test_replacing_still_works_when_revoking_fails(harness: Harness) -> None:
+    sign_in(harness)
+    harness.token_service.revoke_fails = True
+    assert harness.service.connect_with_token("pat", harness.notion.issue_token())["connected"]
+
+
+def test_a_rejected_replacement_keeps_the_current_connection(harness: Harness) -> None:
+    old = sign_in(harness)
+    with pytest.raises(InvalidTokenError):
+        harness.service.connect_with_token("pat", "ntn_rejected_0123456789")
+    assert harness.token_service.revoked == []
+    assert harness.tokens.access_token().reveal() == old

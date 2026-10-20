@@ -1,181 +1,163 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { callPython, waitForBridge } from "./bridge/client";
-import { DiagnosticsPanel } from "./components/DiagnosticsPanel";
+import type { ConnectionInfo } from "./bridge/types";
+import { BrandMark } from "./components/BrandMark";
 import { ErrorBanners } from "./components/ErrorBanners";
-import { useAppInfo, type AppInfoState } from "./components/useAppInfo";
-import {
-  useBridgeCheck,
-  type BridgeCheckState,
-  type ReceivedEvent,
-} from "./components/useBridgeCheck";
-import { noticeFromCallError } from "./errors/reporting";
+import { useAppInfo } from "./components/useAppInfo";
+import { WorkspaceBadge } from "./components/WorkspaceBadge";
+import { useConnection } from "./connection/useConnection";
+import { ConnectView } from "./views/ConnectView";
+import { HomeView } from "./views/HomeView";
+import { PickerView } from "./views/PickerView";
+import { SettingsView } from "./views/SettingsView";
+
+type View = "home" | "settings";
+
+const DISCONNECTED: ConnectionInfo = {
+  connected: false,
+  auth_kind: null,
+  workspace_name: null,
+  workspace_icon: null,
+  account_name: null,
+  database_id: null,
+  data_source_id: null,
+  database_title: null,
+};
 
 export function App() {
   const appInfo = useAppInfo();
-  const bridgeCheck = useBridgeCheck();
+  const connection = useConnection();
+  const [view, setView] = useState<View>("home");
+  const [choosing, setChoosing] = useState(false);
+  const [focusAdvanced, setFocusAdvanced] = useState(false);
 
-  // Tell Python the event listeners are attached. This effect runs after the hooks above have
-  // subscribed, so no pushed event is missed.
+  // Tell Python the page's event listeners are attached. Child effects run first, so every
+  // hook above has subscribed by now and no pushed event is missed.
   useEffect(() => {
     waitForBridge()
       .then(() => callPython("ui_ready"))
       .catch(() => undefined);
   }, []);
 
-  const info = appInfo.status === "ready" ? appInfo.info : null;
+  const details = appInfo.status === "ready" ? appInfo.info : null;
+  const info = connection.load.status === "ready" ? connection.load.info : null;
+
+  const go = (next: View) => {
+    setView(next);
+    setChoosing(false);
+    setFocusAdvanced(false);
+  };
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <h1>Habit Tracker</h1>
-        </div>
-        {info && (
-          <span className={`badge ${info.mode}`}>
-            {info.mode === "dev" ? "Dev mode" : "Normal mode"} · v{info.version}
-          </span>
-        )}
+      <header className="topbar">
+        <span className="brand">
+          <BrandMark />
+          Habit Tracker
+        </span>
+        {info?.connected && <WorkspaceBadge info={info} small />}
+        {details?.mode === "dev" && <span className="dev-flag">Dev mode</span>}
+        <nav aria-label="Main">
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={view === "home" ? "page" : undefined}
+            onClick={() => {
+              go("home");
+            }}
+          >
+            Home
+          </button>
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={view === "settings" ? "page" : undefined}
+            onClick={() => {
+              go("settings");
+            }}
+          >
+            Settings
+          </button>
+        </nav>
       </header>
       <ErrorBanners />
-      <main className="content">
-        <AppInfoCard state={appInfo} />
-        {info && (
-          <BridgeCheckCard
-            state={bridgeCheck.state}
-            events={bridgeCheck.events}
-            onStart={bridgeCheck.start}
+      <main className="page">
+        {connection.load.status === "loading" && (
+          <p className="status" role="status">
+            <span className="spinner" aria-hidden="true" /> Starting…
+          </p>
+        )}
+        {connection.load.status === "unavailable" && (
+          <div className="notice warn" role="alert">
+            <strong>Open this inside Habit Tracker</strong>
+            <p>
+              This page isn&apos;t running inside the Habit Tracker window, so it can&apos;t reach
+              Python. Start the app with <code>uv run habit-tracker --dev</code>.
+            </p>
+          </div>
+        )}
+        {connection.load.status === "error" && (
+          <div className="notice error" role="alert">
+            <strong>The Notion connection couldn&apos;t be read</strong>
+            <p>{connection.load.message}</p>
+            {connection.load.errorId && (
+              <p className="small muted">Error ID {connection.load.errorId}</p>
+            )}
+            <div className="actions">
+              <button type="button" className="button" onClick={connection.reload}>
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+        {info && view === "settings" && (
+          <SettingsView
+            info={info}
+            appInfo={appInfo}
+            focusAdvanced={focusAdvanced}
+            onConnectionChanged={(updated) => {
+              connection.setInfo(updated ?? { ...DISCONNECTED });
+              if (updated === null) connection.reload();
+            }}
+            onChangeDatabase={() => {
+              setView("home");
+              setChoosing(true);
+            }}
           />
         )}
-        {info?.diagnostics && <DiagnosticsPanel />}
+        {info && view === "home" && !info.connected && (
+          <ConnectView onConnected={connection.setInfo} />
+        )}
+        {info && view === "home" && info.connected && (choosing || !info.data_source_id) && (
+          <PickerView
+            info={info}
+            onChosen={(updated) => {
+              connection.setInfo(updated);
+              setChoosing(false);
+            }}
+            onCancel={
+              info.data_source_id
+                ? () => {
+                    setChoosing(false);
+                  }
+                : undefined
+            }
+            onPasteNewToken={() => {
+              setView("settings");
+              setFocusAdvanced(true);
+            }}
+          />
+        )}
+        {info && view === "home" && info.connected && !choosing && info.data_source_id && (
+          <HomeView
+            info={info}
+            onChangeDatabase={() => {
+              setChoosing(true);
+            }}
+          />
+        )}
       </main>
     </div>
-  );
-}
-
-function AppInfoCard({ state }: { state: AppInfoState }) {
-  return (
-    <section className="card" aria-labelledby="bridge-title" aria-busy={state.status === "loading"}>
-      <h2 id="bridge-title">Desktop bridge</h2>
-      {state.status === "loading" && (
-        <p className="status">
-          <span className="spinner" aria-hidden="true" /> Connecting to the app…
-        </p>
-      )}
-      {state.status === "unavailable" && (
-        <p className="status warn">
-          This page isn&apos;t running inside the Habit Tracker window, so it can&apos;t reach
-          Python. Start the app with <code>uv run habit-tracker --dev</code>.
-        </p>
-      )}
-      {state.status === "error" && (
-        <p className="status error">
-          Python couldn&apos;t send the app&apos;s details: {state.message}
-          {state.errorId !== null && ` (error ID ${state.errorId})`}
-        </p>
-      )}
-      {state.status === "ready" && (
-        <>
-          <p className="status ok">
-            <span className="dot" aria-hidden="true" /> Connected. These details came from Python
-            through <code>get_app_info()</code>.
-          </p>
-          <dl className="facts">
-            <dt>Version</dt>
-            <dd>{state.info.version}</dd>
-            <dt>Python</dt>
-            <dd>{state.info.python_version}</dd>
-            <dt>pywebview</dt>
-            <dd>{state.info.pywebview_version}</dd>
-            <dt>SQLite</dt>
-            <dd>
-              {state.info.sqlite_version} · schema version {state.info.schema_version}
-            </dd>
-            <dt>Data folder</dt>
-            <dd>
-              <code>{state.info.data_dir}</code>
-            </dd>
-            <dt>Database</dt>
-            <dd>
-              <code>{state.info.database_path}</code>
-            </dd>
-            <dt>Logs</dt>
-            <dd>
-              <code>{state.info.log_dir}</code>{" "}
-              <button
-                type="button"
-                className="button small"
-                onClick={() => {
-                  callPython("open_log_folder").catch((error: unknown) => {
-                    noticeFromCallError(error, "The log folder couldn't be opened");
-                  });
-                }}
-              >
-                Open
-              </button>
-            </dd>
-            <dt>Started</dt>
-            <dd>{new Date(state.info.started_at).toLocaleString()}</dd>
-          </dl>
-        </>
-      )}
-    </section>
-  );
-}
-
-function BridgeCheckCard({
-  state,
-  events,
-  onStart,
-}: {
-  state: BridgeCheckState;
-  events: readonly ReceivedEvent[];
-  onStart: () => void;
-}) {
-  const busy = state.status === "starting" || state.status === "running";
-  const progress =
-    state.status === "running" ? state.step / state.steps : state.status === "done" ? 1 : 0;
-
-  return (
-    <section className="card" aria-labelledby="events-title">
-      <h2 id="events-title">Events from Python</h2>
-      <p className="muted">
-        Python runs a task on a background thread and pushes a progress event to this window after
-        each step, the same way sync progress will be shown.
-      </p>
-      <div className="actions">
-        <button type="button" className="button primary" disabled={busy} onClick={onStart}>
-          {busy ? "Running…" : state.status === "done" ? "Run again" : "Run bridge check"}
-        </button>
-        <span className="muted" aria-live="polite">
-          {state.status === "running" && `Step ${state.step} of ${state.steps}`}
-          {state.status === "done" && `Received all ${state.steps} steps in ${state.elapsedMs} ms`}
-        </span>
-      </div>
-      <div
-        className="progress"
-        role="progressbar"
-        aria-label="Bridge check progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
-      >
-        <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
-      </div>
-      {events.length === 0 ? (
-        <p className="empty">No events yet. Run the bridge check to see them arrive.</p>
-      ) : (
-        <ol className="event-log">
-          {events.map((event, index) => (
-            <li key={`${event.receivedAt.getTime()}-${index}`}>
-              <time>{event.receivedAt.toLocaleTimeString()}</time>
-              <code>{event.name}</code>
-              <span>{event.detail}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
   );
 }

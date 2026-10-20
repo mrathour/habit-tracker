@@ -82,7 +82,7 @@ def check_ui_results(results: dict[str, Any], log: str) -> None:
 @pytest.mark.skipif(not (ui_dist_dir() / "index.html").is_file(), reason="UI not built")
 def test_normal_mode(tmp_path: Path) -> None:
     results, log = run_harness(tmp_path, "ui")
-    assert results["badge"].startswith("Normal mode")
+    assert results["dev_flag"] is None
     assert results["csp"] is not None
     assert "script-src 'sha256-" in results["csp"]
     assert "unsafe-eval" not in results["csp"]
@@ -94,7 +94,7 @@ def test_normal_mode(tmp_path: Path) -> None:
 )
 def test_dev_mode(tmp_path: Path) -> None:
     results, log = run_harness(tmp_path, "ui", "--dev")
-    assert results["badge"].startswith("Dev mode")
+    assert results["dev_flag"] == "Dev mode"
     assert results["csp"] is None
     check_ui_results(results, log)
     assert "Vite dev server is ready" in log or "already running" in log
@@ -117,3 +117,56 @@ def test_blank_window_is_replaced_by_an_error_page(tmp_path: Path) -> None:
     assert "didn't finish loading" in results["text"]
     assert "Error ID" in results["text"]
     assert "loading the interface failed" in log
+
+
+SERVICE_READY = (REPO_ROOT / "service" / "node_modules" / "wrangler").is_dir()
+
+
+@pytest.mark.skipif(not (ui_dist_dir() / "index.html").is_file(), reason="UI not built")
+def test_connect_with_a_personal_access_token(tmp_path: Path) -> None:
+    # Criterion (a), against a fake Notion: connect, pick the work log, log out, reconnect.
+    results, log = run_harness(tmp_path, "connect-token")
+    assert "Work Log (test)" in results["first_picker"]
+    assert "Reading has 2 data sources" in results["first_picker"]
+    assert "Mayank's personal access token" in results["first_topbar"]
+    assert "connected and reads Work Log (test)" in results["first_home"]
+    assert results["first_keyring"] == 1
+    assert "Connected with a personal access token" in results["first_settings"]
+    assert "revoke it under Personal access tokens" in results["first_summary"]
+    assert "kept on this computer" in results["first_summary"]
+    assert results["first_keyring_after_logout"] == 0
+    # Reconnecting keeps the database choice; clearing local data forgets it.
+    assert "connected and reads Work Log (test)" in results["again_home"]
+    assert results["again_keyring"] == 1
+    assert "were deleted" in results["cleared_summary"]
+    assert results["cleared_keyring_after_logout"] == 0
+    assert results["after_clear"] == "picker"
+    assert "Connected to Notion with a pasted pat token" in log
+    assert "ntn_" not in log
+
+
+@pytest.mark.skipif(not SERVICE_READY, reason="service/node_modules not installed")
+def test_connect_to_notion_through_the_token_service(tmp_path: Path) -> None:
+    # The full OAuth chain: app -> local Worker -> fake Notion -> Worker -> loopback listener.
+    results, log = run_harness(tmp_path, "connect-oauth")
+    pages = results["browser_pages"]
+    assert pages[-1]["status"] == 200
+    assert "Connected to Notion" in pages[-1]["text"]
+    assert pages[-1]["url"].startswith("http://127.0.0.1:")
+    assert "E2E Workspace" in results["oauth_topbar"]
+    assert "Connected with Notion sign-in" in results["oauth_settings"]
+    assert results["oauth_keyring"] == 1
+    assert "Notion cancelled Habit Tracker's access" in results["oauth_summary"]
+    assert results["oauth_keyring_after_logout"] == 0
+    assert results["valid_tokens_remaining"] == 0  # revoke reached Notion
+    assert "Connected to Notion through OAuth" in log
+    assert "ntn_" not in log
+    assert "nrt_" not in log
+
+
+@pytest.mark.skipif(not SERVICE_READY, reason="service/node_modules not installed")
+def test_declining_in_notion_is_reported_at_once(tmp_path: Path) -> None:
+    results, _log = run_harness(tmp_path, "connect-oauth-deny")
+    assert "Access wasn't allowed" in results["notice"]
+    assert "Sign-in cancelled" in results["browser_pages"][-1]["text"]
+    assert results["keyring"] == 0

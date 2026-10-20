@@ -132,7 +132,7 @@ class ConnectionService:
         db: sqlite3.Connection,
         emit: EventSink,
         make_reader: Callable[[TokenManager], NotionReader] | None = None,
-        open_browser: Callable[[str], object] = webbrowser.open,
+        open_browser: Callable[[str], object] = lambda url: webbrowser.open(url),
         http: httpx.Client | None = None,
         sign_in_timeout_s: float = SIGN_IN_TIMEOUT_S,
     ) -> None:
@@ -185,7 +185,9 @@ class ConnectionService:
         candidate = StoredCredential(kind=kind, access_token=secret, obtained_at=utc_now())
         me = self._check_token(candidate)
         details = _identity(me)
-        # Validated: now it may be stored.
+        # Validated: now it may be stored. A Notion sign-in it replaces is revoked first, so the
+        # old access doesn't linger in Notion (a failure here never blocks the new connection).
+        self._revoke_previous_oauth()
         self._tokens.replace_credential(candidate)
         self._settings.set_many(
             {
@@ -198,6 +200,15 @@ class ConnectionService:
         )
         logger.info("Connected to Notion with a pasted %s token", kind)
         return self.info()
+
+    def _revoke_previous_oauth(self) -> None:
+        previous = self._tokens.credential()
+        if previous is None or previous.kind != "oauth":
+            return
+        try:
+            self._service.revoke(previous.access_token)
+        except Exception as exc:  # noqa: BLE001 - replacing must not fail because of this
+            logger.warning("Couldn't revoke the replaced connection: %s", type(exc).__name__)
 
     def _check_token(self, candidate: StoredCredential) -> dict[str, Any]:
         """Validate a token without storing it: a throwaway manager holds it in memory only."""
