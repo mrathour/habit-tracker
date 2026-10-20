@@ -25,7 +25,7 @@ head_sampling_rate = 1
 
 [vars]
 # The Notion OAuth client ID is public. It's set once the Notion connection exists.
-NOTION_CLIENT_ID = ""
+NOTION_CLIENT_ID = "3ffd872b-594c-81fa-a7d5-003757ac19e0"
 NOTION_API_BASE = "https://api.notion.com"
 
 # Per-IP rate limits (PLAN.md 12.2), counted over one minute and not kept beyond it.
