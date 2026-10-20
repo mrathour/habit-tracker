@@ -63,6 +63,7 @@ PowerShell, from the repository root. The installer build arrives in Phase 8.
 ```powershell
 uv sync                       # Python 3.12 venv in .venv, from uv.lock
 npm --prefix ui ci            # UI packages, from ui/package-lock.json
+npm --prefix service ci       # token service packages (also needed for the OAuth window tests)
 uv run pre-commit install     # git hook: lint, format, type check, secret scan on commit
 ```
 
@@ -86,6 +87,7 @@ uv run pytest                 # back-end tests (excludes the window tests)
 uv run pytest -m gui          # end-to-end tests that open the real window; build the UI first
 uv run pytest --cov           # with coverage
 npm --prefix ui test          # UI tests (Vitest)
+npm --prefix service test     # token service tests (Vitest in the Workers runtime)
 ```
 
 **Lint, format and type check:**
@@ -97,8 +99,22 @@ uv run mypy
 npm --prefix ui run lint
 npm --prefix ui run format    # format:check to only report
 npm --prefix ui run typecheck
+npm --prefix service run lint
+npm --prefix service run typecheck
+npm --prefix service run types   # wrangler.toml and worker-configuration.d.ts agree
 uv run pre-commit run --all-files   # every hook, as CI runs them
 ```
+
+**Token service (`service/`, details in `docs/token-service.md`):**
+
+```powershell
+npm --prefix service run dev      # local Worker on http://127.0.0.1:8787 (copy service/.dev.vars.example to .dev.vars first)
+npm --prefix service run deploy   # checks page values and tests, then deploys to https://habit-tracker.mrathour.workers.dev
+```
+
+Secrets are set only by the user, in their own terminal, with `npx wrangler secret put`. Never ask for or handle their values.
+
+**Test overrides:** `HABIT_TRACKER_SERVICE_URL` and `HABIT_TRACKER_NOTION_URL` point the app at a local token service and a fake Notion (the end-to-end tests use them). `PYTHON_KEYRING_BACKEND` is never needed: tests force an in-memory keyring.
 
 **Build the UI:** `npm --prefix ui run build` type-checks, then writes the single-file bundle to `ui/dist/index.html`.
 

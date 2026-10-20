@@ -249,7 +249,7 @@ Indexes on `start_utc` and `parent_task_id`.
 
 **`settings`** is a key–value table (`key TEXT PRIMARY KEY, value TEXT` holding JSON). Its keys are:
 - **Notion source:** `database_id`, `data_source_id`, `database_title`;
-- **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`;
+- **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`, `workspace_icon` (`{type: "emoji" | "image", value}`; images are stored as a data URI), `account_name` (the person behind a personal access token);
 - **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
 - **Policy:** `acknowledged_policy_version` (13);
@@ -360,15 +360,22 @@ The user chooses which kind they are pasting:
 ### 12.6 Database picker
 
 - **Search:** the picker pages through `POST /v1/search` filtered to data sources (Notion API 2026-03-11).
-- **Display:** it shows each data source with its parent database's title.
-- **Saved:** `database_id` and `data_source_id` (11).
-- **Empty:** if nothing is found, the picker explains how to share the database with the connection and offers "Connect again".
+- **Display:** data sources are grouped under their parent database, whose title (and emoji icon) is fetched once per database. A database with several data sources shows them as choices once it is selected. "Show more databases" loads the next page of search results.
+- **Saved:** `database_id`, `data_source_id` and `database_title` (11), after checking with `GET /v1/data_sources/{id}` that the data source is readable and belongs to that database.
+- **Switching:** choosing a different data source while entries from the previous one are stored asks first. Confirming removes those entries and the old database's mapping and sync times; they stay in Notion. Choosing the same one again keeps everything.
+- **Empty:** if nothing is found, the picker explains how to share the database, with steps for the kind of connection: Add connections for Notion sign-in and internal tokens; for a personal access token, that the database must be visible to its owner. It offers "Refresh" and, for Notion sign-in, "Connect again and choose pages".
+- **Problems:** a 401 shows "Reconnect to Notion" (OAuth) or "Paste a new token" (pasted tokens). Offline and other errors offer "Try again".
 
 ### 12.7 Logout
 
-1. **Revoke:** for OAuth, the app calls `/revoke`. A failure doesn't block logout.
-2. **Delete:** it deletes the Credential Manager entry.
-3. **Ask:** it asks whether to keep or clear the local data, as before.
+1. **Ask first:** the Disconnect dialog asks whether to keep or delete the entries copied to this computer.
+2. **Revoke:** for OAuth, the app calls `/revoke`. A failure doesn't block logout; the app says Notion's access couldn't be cancelled and how to remove it in Notion. Pasted tokens can't be revoked by the app, so it explains where to revoke or delete them.
+3. **Delete:** it deletes the Credential Manager entry and the connection metadata (11).
+4. **Local data:**
+   - **Keep:** keeps the entries and the database choice, so reconnecting picks up where it left off.
+   - **Delete:** removes the entries, the database choice, the mapping and the sync times. Preferences stay.
+
+**Replacing a connection:** pasting a token while connected through Notion sign-in revokes the old OAuth access first. A failure there doesn't block the new connection.
 
 ## 13. Windows packaging
 
@@ -406,7 +413,10 @@ habit-tracker/
 │   └── workflows/           # ci.yml (Phase 2), release (Phase 8)
 ├── docs/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
-│   └── extension-notes.md   # Phase 1 output
+│   ├── extension-notes.md   # Phase 1 output
+│   ├── handoff-protocol.md  # Phase 3: signed state and encrypted hand-off, shared by app and service
+│   ├── token-service.md     # Phase 3: service setup, secrets, deploy
+│   └── notion-integration.md # Phase 3: the Notion public connection's settings
 ├── service/                 # Token service: Cloudflare Worker (TypeScript), Phase 3
 │   ├── src/                 # /start, /callback, /refresh, /revoke, /health, page routes
 │   ├── pages/               # home, privacy policy, terms, support (served by the Worker)
@@ -422,16 +432,17 @@ habit-tracker/
 │   ├── log.py, redaction.py # rotating logs; secret masking
 │   ├── errors.py, error_page.py  # error reports with IDs; the in-window error page
 │   ├── devserver.py         # Vite dev server for dev mode
-│   ├── notion/              # auth (OAuth, pasted tokens, refresh), client, pagination, property readers
+│   ├── single_instance.py   # one running copy per data folder (named mutex)
+│   ├── notion/              # handoff, loopback listener, credentials, tokens (renewal), service client, read-only client, connection (connect, picker, logout); later: pagination, property readers
 │   ├── sync/                # quick sync, full sync, schema check
 │   ├── mapping/             # auto-matcher, extra fields
 │   ├── validation/          # entry checks
 │   ├── stats/               # daily totals, weeks, streaks, midnight split
-│   └── db/                  # connections, migrator, migrations/*.sql, queries
+│   └── db/                  # connections, migrator, migrations/*.sql, settings, queries
 ├── ui/                      # React + Vite front end
 │   ├── src/                 # bridge/, errors/, components/, tests next to the code
 │   └── plugins/             # Vite plugins (Content-Security-Policy)
-├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui)
+├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui); tests/support has the fake Notion, in-memory keyring, hand-off vectors and screenshots
 └── packaging/               # PyInstaller spec, Inno Setup script
 ```
 
@@ -444,7 +455,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 0. Project setup | Install and verify every tool, configure Git, create the GitHub repository, and add the housekeeping files. Full checklist in 15.1. | The private GitHub repo exists with the first commit pushed, every tool reports its version, and `docs/setup.md` records them. |
 | 1. Explore the extension | Read the Chrome extension at `C:\Users\LENOVO\Documents\JS\myNotionNotes` without modifying it. Document its auth flow, Notion API calls, pagination and error handling in `docs/extension-notes.md`. Propose the auth design. | The user approves the notes and the auth design. |
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
-| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | The user connects through OAuth and sees their Work Log in the picker. Connecting with an internal integration token and with a PAT also works. Logout revokes and removes the token. Service and app tests pass in CI. |
+| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | **(a)** With a personal access token, the user connects, sees their workspace, picks their Work Log, logs out and reconnects; all CI checks pass. **(b)** The token service is deployed and its tests pass. **(c)** OAuth sign-in from the app works end to end. **(d)** OAuth sign-in from the app also works for a second Notion workspace that doesn't own the integration; if Notion blocks it pending review, what the review requires is recorded here. |
 | 4. Map | Build auto-matching, the review screen, extra-field selection, and missing-required-field errors. | The author's Work Log maps correctly, and a fixture schema missing an end-time column shows a clear error (covered by tests and viewable in the UI with that fixture). |
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
@@ -583,3 +594,12 @@ Phase 0 is the only phase committed directly to `main`.
 - **Rate limits per IP.** OAuth routes allow 20 requests a minute, and pages 120.
 - **Deploy guard.** `npm run deploy` refuses while any page placeholder is unfilled, and runs the tests first. |
 | 2026-10-20 | Phase 3: confirmed live that the unreviewed "Habit Tracker" public connection signs in through the deployed token service (`https://habit-tracker.mrathour.workers.dev`), and that the hand-off and revoke work. **This is verified only for the author's own workspace, where the author owns the connection.** Whether a workspace the author doesn't own can sign in without review is checked in Phase 3 verification (d). Until (d) passes, "no review needed" is not assumed for other users. |
+| 2026-10-20 | Phase 3 app auth decisions:
+- **Isolated copies.** A copy of the app pointed at another data folder (`HABIT_TRACKER_HOME`) uses its own Credential Manager account (`notion-<hash>`) and its own single-instance lock, so tests and throwaway copies never touch the real connection. A second launch focuses the running window and exits.
+- **Retries.** The read-only Notion client also retries 5xx on read-only POSTs (search, query), which `notion-client` won't retry. A request is renewed at most once on 401; a second 401 means "Reconnect to Notion".
+- **Pasted-token check.** A pasted token is checked with `GET /v1/users/me` from memory and stored only if Notion accepts it. A person returned by `users/me` (personal access tokens) is shown by name.
+- **Error codes for the UI.** Error reports carry a `code` (the error's UI state) so screens can offer the right action.
+- **No secrets in settings.** `settings` refuses keys that sound like secrets.
+- **Opening links.** Only HTTPS links to Notion and the token service open in the browser. |
+| 2026-10-20 | Phase 3 UI: the app's visual style is a time sheet: Bahnschrift for headings and figures, Segoe UI Variable for text, ledger green `#2f6f5e` on a cool grey. No web fonts, so the CSP stays strict and the UI works offline. The Connect screen's hero is a week of sessions on a 24-hour strip. |
+| 2026-10-20 | Phase 3 testing: end-to-end window tests run against a fake Notion served over HTTP. For OAuth they also run the real token service locally with `wrangler dev`, with a scripted browser following the real redirects. Every test uses an in-memory keyring. The token service gets its own CI job and Dependabot entry, and pre-commit hooks for `service/`. |

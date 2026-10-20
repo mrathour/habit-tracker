@@ -74,3 +74,21 @@ repos:
         language: system
         files: ^ui/.*\.(ts|tsx)$|^ui/tsconfig.*\.json$
         pass_filenames: false
+      - id: prettier-service
+        name: prettier (service)
+        entry: node service/node_modules/prettier/bin/prettier.cjs --write --ignore-unknown
+        language: system
+        files: ^service/
+        exclude: ^service/(package-lock\.json|worker-configuration\.d\.ts)$
+      - id: eslint-service
+        name: eslint (service)
+        entry: npm --prefix service run lint
+        language: system
+        files: ^service/.*\.(ts|js|mjs)$
+        pass_filenames: false
+      - id: tsc-service
+        name: TypeScript type check (service)
+        entry: npm --prefix service run typecheck
+        language: system
+        files: ^service/.*\.ts$|^service/(tsconfig\.json|wrangler\.toml)$
+        pass_filenames: false

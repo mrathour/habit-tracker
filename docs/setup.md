@@ -77,6 +77,7 @@ WebView2 check:
    ```powershell
    uv sync
    npm --prefix ui ci
+   npm --prefix service ci
    uv run pre-commit install
    ```
 
