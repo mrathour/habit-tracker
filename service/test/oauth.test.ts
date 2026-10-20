@@ -76,7 +76,7 @@ const allowAll = { limit: () => Promise.resolve({ success: true }) } as unknown 
 function makeEnv(overrides: Partial<Env> = {}): Env {
   return {
     ...testEnv,
-    NOTION_CLIENT_ID: CLIENT_ID as never,
+    NOTION_CLIENT_ID: CLIENT_ID,
     NOTION_CLIENT_SECRET: CLIENT_SECRET,
     STATE_SIGNING_KEY: SIGNING_KEY,
     NOTION_API_BASE: "https://api.notion.com",

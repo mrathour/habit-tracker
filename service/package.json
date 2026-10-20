@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "types": "wrangler types --check"
+    "types": "wrangler types --strict-vars=false --check"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.4",

@@ -47,7 +47,7 @@ interface Config {
 }
 
 function config(env: Env): Config | null {
-  const clientId = env.NOTION_CLIENT_ID as string;
+  const clientId = env.NOTION_CLIENT_ID;
   const clientSecret = env.NOTION_CLIENT_SECRET ?? "";
   const signingKey = env.STATE_SIGNING_KEY ?? "";
   if (!clientId || !clientSecret || !signingKey) return null;
