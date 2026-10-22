@@ -20,9 +20,15 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 **Phase 2: Scaffold** is complete and approved (2026-10-18, PR #2). It delivered the uv Python project, the React + TypeScript + Vite UI, the pywebview window and JS bridge (dev and normal modes), `%APPDATA%\HabitTracker\` paths, the SQLite schema with versioned migrations, redacting rotating logs, in-window error handling, and CI, pre-commit and Dependabot. There is no branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
 
-**Current: Phase 3: Connect**, on the branch `phase-3-connect`. Scope and "Done when" are in `PLAN.md` section 15, with the auth design in section 12. Work has not started yet: wait for the user's Phase 3 instructions, then restate what you'll build and how it will be checked.
+**Phase 3: Connect** is complete and approved (2026-10-22, PR #5).
+- **Token service:** live at `https://habit-tracker.mrathour.workers.dev` (`service/`, `docs/token-service.md`). The user sets its secrets; never ask for or handle them.
+- **App connection:** Notion sign-in with an encrypted hand-off, pasted tokens, Credential Manager storage, and a read-only Notion client.
+- **Screens:** database picker, logout, single-instance guard, and the connect, picker, home and settings screens.
+- **Open item:** sign-in from a workspace that doesn't own the integration was accepted without being verified (`PLAN.md` Open items).
 
-**Next: Phase 4: Map** (see `PLAN.md` section 15).
+**Current: Phase 4: Map**, on the branch `phase-4-map`. Scope and "Done when" are in `PLAN.md` section 15, with the mapping rules in section 4. Work has not started yet: wait for the user's Phase 4 instructions, then restate what you'll build and how it will be checked.
+
+**Next: Phase 5: Sync** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
