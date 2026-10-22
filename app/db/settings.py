@@ -20,8 +20,17 @@ CONNECTION_KEYS: Final = (
     "workspace_icon",
     "account_name",
 )
+#: The column mapping (PLAN.md 4) and the flag set when it changes after the first save.
+MAPPING_KEY: Final = "mapping"
+FULL_SYNC_REQUIRED_KEY: Final = "full_sync_required"
 #: Data that belongs to one Notion database: cleared with "clear local data".
-SOURCE_DATA_KEYS: Final = (*SOURCE_KEYS, "mapping", "last_successful_sync", "last_full_sync")
+SOURCE_DATA_KEYS: Final = (
+    *SOURCE_KEYS,
+    MAPPING_KEY,
+    FULL_SYNC_REQUIRED_KEY,
+    "last_successful_sync",
+    "last_full_sync",
+)
 
 #: Words a token must never be stored under, as a guard against mistakes.
 _FORBIDDEN_FRAGMENTS: Final = ("token", "secret", "password")

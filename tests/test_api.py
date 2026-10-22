@@ -30,6 +30,8 @@ PUBLIC_METHODS = {
     "logout",
     "list_data_sources",
     "choose_data_source",
+    "get_mapping_review",
+    "save_mapping",
     "open_external",
 }
 
