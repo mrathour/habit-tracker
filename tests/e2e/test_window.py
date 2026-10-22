@@ -359,3 +359,24 @@ def test_parent_task_maps_once_its_database_is_shared_and_opens_in_notion(
     assert "Linked page 2" in results["detail"]
     assert results["opened"] == [task, task, second]
     assert "ntn_" not in log
+
+
+def test_newer_policy_notice_shows_once_and_never_contacts_the_website(tmp_path: Path) -> None:
+    """PLAN.md 15, Phase 8: a build with a newer policy version shows the notice once on its
+    first launch, before anything else, and never contacts the website."""
+    results, log = run_harness(tmp_path, "policy-notice")
+    assert "Version 2" in results["notice_text"]
+    assert "TEST BUILD ONLY" in results["notice_text"]
+    assert results["nav_shown"] is False
+    # Nothing reached Notion while the notice was waiting; continuing then lets the app work.
+    assert results["notion_requests_before_continue"] == 0
+    assert results["notion_requests_after_continue"] > 0
+    assert results["after_continue"] == "picker"
+    assert results["acknowledged"] == 2
+    assert results["service_requests"] == []
+    assert "Privacy policy version 2 acknowledged" in log
+
+    again, _ = run_harness(tmp_path, "policy-relaunch")
+    assert again["notice_shown"] is False
+    assert again["service_requests"] == []
+    assert again["acknowledged"] == 2

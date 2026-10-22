@@ -74,7 +74,9 @@ class PolicyFileError(ValueError):
     """The bundled policy file is malformed: a build mistake, caught by tests and the build."""
 
 
-def load_policy(path: Path = POLICY_FILE) -> BundledPolicy:
+def load_policy(path: Path | None = None) -> BundledPolicy:
+    """Read and check the bundled policy file (``POLICY_FILE`` unless ``path`` is given)."""
+    path = path or POLICY_FILE
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:

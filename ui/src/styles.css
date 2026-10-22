@@ -246,7 +246,16 @@ a {
   cursor: pointer;
 }
 
-:is(.button, .link-button, .nav-link, input, select, textarea, [tabindex]):focus-visible {
+/* Headings focused by the app (tabindex="-1") to move screen readers along get no ring. */
+:is(
+  .button,
+  .link-button,
+  .nav-link,
+  input,
+  select,
+  textarea,
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

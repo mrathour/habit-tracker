@@ -111,40 +111,42 @@ export function App() {
         {info?.connected && <WorkspaceBadge info={info} small />}
         {canSync && sync.load.status === "ready" && <SyncIndicator sync={sync.load.sync} />}
         {details?.mode === "dev" && <span className="dev-flag">Dev mode</span>}
-        <nav aria-label="Main" hidden={!cleared}>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={view === "home" ? "page" : undefined}
-            onClick={() => {
-              go("home");
-            }}
-          >
-            Home
-          </button>
-          {canSync && (
+        {cleared && (
+          <nav aria-label="Main">
             <button
               type="button"
               className="nav-link"
-              aria-current={view === "rawlog" ? "page" : undefined}
+              aria-current={view === "home" ? "page" : undefined}
               onClick={() => {
-                go("rawlog");
+                go("home");
               }}
             >
-              Raw log
+              Home
             </button>
-          )}
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={view === "settings" ? "page" : undefined}
-            onClick={() => {
-              go("settings");
-            }}
-          >
-            Settings
-          </button>
-        </nav>
+            {canSync && (
+              <button
+                type="button"
+                className="nav-link"
+                aria-current={view === "rawlog" ? "page" : undefined}
+                onClick={() => {
+                  go("rawlog");
+                }}
+              >
+                Raw log
+              </button>
+            )}
+            <button
+              type="button"
+              className="nav-link"
+              aria-current={view === "settings" ? "page" : undefined}
+              onClick={() => {
+                go("settings");
+              }}
+            >
+              Settings
+            </button>
+          </nav>
+        )}
       </header>
       <ErrorBanners />
       <main className="page" data-wide={view === "rawlog" && cleared ? "true" : undefined}>

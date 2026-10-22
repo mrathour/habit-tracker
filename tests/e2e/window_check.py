@@ -29,6 +29,10 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
 * ``sync-relaunch``: a second launch on that folder: Notion edits and a deletion are made first;
   the launch's quick sync picks up the edits, and a full sync from Settings removes the deleted
   entry.
+* ``policy-notice``: a copy connected through Notion sign-in that acknowledged policy version 1
+  opens a build bundling version 2 (``packaging/test-policy.json``): the notice comes first,
+  nothing reaches Notion until Continue, and the token service is never contacted;
+* ``policy-relaunch``: the next launch of that build on the same folder shows no notice.
 
 Results are written as JSON; the process exits 0 even when a check fails, so the test can
 report every finding.
@@ -36,6 +40,7 @@ report every finding.
 
 from __future__ import annotations
 
+import http.server
 import json
 import os
 import shutil
@@ -458,6 +463,97 @@ def sync_relaunch(fake: FakeNotionServer, home: Path) -> Scenario:
         snap("sync-full")
 
     return scenario
+
+
+POLICY_TITLE = "The privacy policy has changed"
+TEST_POLICY = REPO_ROOT / "packaging" / "test-policy.json"
+
+
+class RecordingService:
+    """Stands in for the token service: records every request, so a test can prove none came."""
+
+    def __init__(self) -> None:
+        self.requests: list[str] = []
+        recorder = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def _record(self) -> None:
+                recorder.requests.append(f"{self.command} {self.path}")
+                self.send_response(503)
+                self.end_headers()
+
+            do_GET = do_POST = _record  # noqa: N815 - http.server method names
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                pass
+
+        self._httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self._httpd.server_address[1]}"
+        threading.Thread(target=self._httpd.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self._httpd.shutdown()
+
+
+def seed_policy_copy(fake: FakeNotionServer, paths: AppPaths) -> None:
+    """A copy that connected with Notion sign-in and acknowledged policy version 1."""
+    from app.db import open_database
+    from app.db.settings import Settings
+    from app.notion.credentials import CredentialStore, StoredCredential, utc_now
+    from app.redaction import Secret
+
+    seed_fake_notion(fake)
+    CredentialStore(paths.credential_account).save(
+        StoredCredential(
+            kind="oauth",
+            access_token=Secret(fake.notion.issue_token()),
+            refresh_token=Secret("nrt_e2e_policy_refresh"),
+            obtained_at=utc_now(),
+        )
+    )
+    database = open_database(paths.database)
+    Settings(database.connection).set_many(
+        {
+            "acknowledged_policy_version": 1,
+            "auth_kind": "oauth",
+            "workspace_name": "E2E Workspace",
+        }
+    )
+    database.close()
+
+
+def policy_notice(fake: FakeNotionServer, service: RecordingService) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is(POLICY_TITLE))
+        results["notice_text"] = text(window, ".policy-notice")
+        results["nav_shown"] = window.evaluate_js("document.querySelector('nav') !== null")
+        snap("policy-notice")
+        # Give anything that wrongly starts behind the notice time to reach Notion.
+        time.sleep(3)
+        results["notion_requests_before_continue"] = len(fake.notion.requests)
+        click(window, "Continue")
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        results["after_continue"] = "picker"
+        results["notion_requests_after_continue"] = len(fake.notion.requests)
+        results["service_requests"] = list(service.requests)
+        save_state(fake, paths_root(window))
+
+    return scenario
+
+
+def policy_relaunch(fake: FakeNotionServer, service: RecordingService) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        results["notice_shown"] = window.evaluate_js(heading_is(POLICY_TITLE))
+        results["service_requests"] = list(service.requests)
+
+    return scenario
+
+
+def paths_root(_window: Any) -> Path:
+    return AppPaths.resolve().root
 
 
 def local_iso(day: date, hour: int, minute: int = 0) -> str:
@@ -946,6 +1042,29 @@ def main() -> int:
             seed_fake_notion(fake)
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(mapping(fake))
+    elif name in ("policy-notice", "policy-relaunch"):
+        import app.policy
+
+        # This run is the "newer" build: it bundles policy version 2.
+        app.policy.POLICY_FILE = TEST_POLICY  # type: ignore[misc]
+        service = RecordingService()
+        os.environ[SERVICE_URL_ENV_VAR] = service.url
+        with FakeNotionServer() as fake:
+            if name == "policy-notice":
+                seed_policy_copy(fake, paths)
+                scenario = policy_notice(fake, service)
+            else:
+                load_state(fake, paths.root)
+                scenario = policy_relaunch(fake, service)
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            exit_code = open_window(scenario)
+        service.close()
+        from app.db import open_database
+        from app.db.settings import Settings
+
+        database = open_database(paths.database)
+        results["acknowledged"] = Settings(database.connection).get("acknowledged_policy_version")
+        database.close()
     elif name in ("connect-oauth", "connect-oauth-deny"):
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)
