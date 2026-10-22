@@ -21,6 +21,8 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
   Log's automatic mapping, saving, reopening and changing it (full sync required);
 * ``sync-first``: connect, map and let the first sync copy every entry (good and broken), then
   save the fake Notion and keyring to the data folder;
+* ``rawlog``: sync the broken entries, open the raw log from the dashboard's flagged count, and
+  read every red cell and its explanation, selecting and opening a row, and a CSV export;
 * ``sync-relaunch``: a second launch on that folder: Notion edits and a deletion are made first;
   the launch's quick sync picks up the edits, and a full sync from Settings removes the deleted
   entry.
@@ -535,6 +537,85 @@ def dashboard(fake: FakeNotionServer) -> Scenario:
     return scenario
 
 
+def rawlog(fake: FakeNotionServer, home: Path, opened: list[str]) -> Scenario:
+    """Connect, sync the broken entries, open the raw log from the dashboard's flagged count,
+    and read every red cell, a hover explanation, selection, opening, and a CSV export."""
+
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        paste_token(window, fake.notion.issue_token())
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log (test)")
+        click(window, "Use this database")
+        wait_for(window, MAPPING_LOADED)
+        click(window, "Save mapping")
+        wait_for(window, heading_is("Work Log (test)"))
+        wait_for_sync(window, "Full sync")
+        wait_for(window, "document.querySelector('.stat-row .stat:not(.skeleton)') !== null")
+        click(window, "See them in the raw log")
+        wait_for(window, heading_is("Raw log"))
+        wait_for(window, "document.querySelectorAll('tr[data-page-id]').length > 0")
+        results["status"] = text(window, ".rawlog-head [role=status]")
+        results["chips"] = text(window, "[aria-label='Active filters']")
+        results["rows"] = window.evaluate_js(
+            "[...document.querySelectorAll('tr[data-page-id]')].map((tr) => ({"
+            " page_id: tr.dataset.pageId,"
+            " red: [...tr.querySelectorAll('td.cell-issue')]"
+            ".map((td) => [td.dataset.kind, td.dataset.tip]) }))"
+        )
+
+        # Hovering over a red cell explains it.
+        mismatch = "tr[data-page-id='p-mismatch']"
+        window.evaluate_js(
+            f'document.querySelector("{mismatch} td.cell-issue")'
+            ".dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))"
+        )
+        wait_for(window, "document.querySelector('.cell-tooltip') !== null")
+        results["tooltip"] = text(window, ".cell-tooltip")
+        snap("rawlog-issues")
+
+        # A click only selects; a double-click opens the entry in Notion.
+        window.evaluate_js(f'document.querySelector("{mismatch} td[data-kind=task_name]").click()')
+        wait_for(window, f'document.querySelector("{mismatch}").ariaSelected === "true"')
+        time.sleep(0.5)
+        results["opened_after_click"] = list(opened)
+        window.evaluate_js(
+            f'document.querySelector("{mismatch} td[data-kind=task_name]")'
+            ".dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))"
+        )
+        deadline = time.monotonic() + TIMEOUT_S
+        while not opened and time.monotonic() < deadline:
+            time.sleep(0.2)
+        results["opened_after_double_click"] = list(opened)
+
+        # Export what's on screen through the (stubbed) native Save dialog.
+        target = home / "exports" / "raw log.csv"
+        target.parent.mkdir(exist_ok=True)
+        window.create_file_dialog = lambda *_args, **_kwargs: str(target)
+        click(window, "Export CSV")
+        wait_for(
+            window,
+            "document.querySelector('.export-notice') !== null",
+        )
+        results["export_notice"] = text(window, ".export-notice")
+        raw = target.read_bytes() if target.exists() else b""
+        results["csv_bom"] = raw.startswith(b"\xef\xbb\xbf")
+        results["csv"] = raw[3:].decode("utf-8") if raw else ""
+        snap("rawlog-export")
+
+        # Clearing the filters shows every entry.
+        click(window, "Clear all")
+        wait_for(
+            window,
+            "(() => { const s = document.querySelector('.rawlog-head [role=status]');"
+            " return s !== null && !s.innerText.startsWith('Showing'); })()",
+        )
+        results["all_status"] = text(window, ".rawlog-head [role=status]")
+
+    return scenario
+
+
 def edit_in_notion(fake: FakeNotionServer) -> None:
     """What the user does in Notion between the two launches."""
     notion = fake.notion
@@ -724,6 +805,21 @@ def main() -> int:
             add_source(fake.notion, "Work Log (test)", work_log_schema(), dashboard_rows())
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(dashboard(fake))
+    elif name == "rawlog":
+        with FakeNotionServer() as fake:
+            fake.notion.workspace_name = "E2E Workspace"
+            add_source(
+                fake.notion, "Work Log (test)", work_log_schema(), work_log_rows() + broken_rows()
+            )
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            opened: list[str] = []
+
+            def record(url: str, *_args: Any, **_kwargs: Any) -> bool:
+                opened.append(url)
+                return True
+
+            webbrowser.open = record
+            exit_code = open_window(rawlog(fake, paths.root, opened))
     elif name == "mapping":
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)

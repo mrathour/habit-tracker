@@ -1597,31 +1597,29 @@ a {
 
 .rawlog {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
+}
+
+.page[data-wide="true"] {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .rawlog-head {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 8px 16px;
   flex-wrap: wrap;
 }
 
-.rawlog-toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px 16px;
-  align-items: start;
-}
-
+/* The buttons sit at the head's right; an export notice takes its own full-width line. */
 .rawlog-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 420px;
+  display: contents;
+}
+
+.rawlog-actions > button:first-child {
+  margin-left: auto;
 }
 
 .rawlog-actions .export-notice {
@@ -2052,15 +2050,4 @@ th[aria-sort="descending"] .sort-button {
 
 .rawlog-help {
   margin-top: 8px;
-}
-
-@media (max-width: 760px) {
-  .rawlog-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .rawlog-actions {
-    justify-content: flex-start;
-    max-width: none;
-  }
 }

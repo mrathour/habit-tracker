@@ -343,6 +343,7 @@ export function RawLogTable({
               <tr
                 key={row.page_id}
                 id={`rawlog-row-${String(index)}`}
+                data-page-id={row.page_id}
                 aria-rowindex={index + 2}
                 aria-selected={index === active}
                 className={index === active ? "selected" : undefined}

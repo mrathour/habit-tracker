@@ -102,17 +102,7 @@ export function RawLogView({
           {data.load.status === "ready" && data.load.refreshing && " · Updating…"}
           {sync?.running && " · Sync in progress"}
         </p>
-      </div>
-
-      {page && page.total_entries > 0 && (
-        <div className="rawlog-toolbar">
-          <FilterBar
-            filters={filters}
-            onChange={onFiltersChange}
-            columns={page.columns}
-            parents={page.parents}
-            problems={problems}
-          />
+        {page && page.total_entries > 0 && (
           <div className="rawlog-actions">
             <ColumnPicker columns={page.columns} hidden={shownHidden} onChange={onHidden} />
             <ExportControl
@@ -121,7 +111,17 @@ export function RawLogView({
               matched={data.load.status === "ready" && !data.load.refreshing ? page.matched : 0}
             />
           </div>
-        </div>
+        )}
+      </div>
+
+      {page && page.total_entries > 0 && (
+        <FilterBar
+          filters={filters}
+          onChange={onFiltersChange}
+          columns={page.columns}
+          parents={page.parents}
+          problems={problems}
+        />
       )}
 
       {data.load.status === "loading" && (
