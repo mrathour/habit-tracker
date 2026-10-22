@@ -146,9 +146,10 @@ def run_scenario(scenario: Scenario) -> Callable[[Any, dict[str, Any]], None]:
 
 def diagnostics(window: Any, results: dict[str, Any]) -> None:
     wait_for(window, heading_is("See where your working hours go"))
-    results["dev_flag"] = text(window, ".dev-flag")
     click(window, "Settings")
     wait_for(window, "document.querySelector('.card .status.ok') !== null")
+    # Read only once the app's details have arrived: the flag depends on them.
+    results["dev_flag"] = text(window, ".dev-flag")
     results["facts"] = text(window, ".card .facts")
     results["csp"] = window.evaluate_js(
         "document.querySelector('meta[http-equiv=\"Content-Security-Policy\"]')?.content ?? null"
