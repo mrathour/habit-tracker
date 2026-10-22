@@ -8,8 +8,20 @@ import type {
   ConnectionInfo,
   DataSourcePage,
   ErrorCode,
+  MappingReview,
   PythonApi,
 } from "../bridge/types";
+import fixtures from "./mappingFixtures.json";
+
+/**
+ * Mapping reviews made by the real Python service (tests/support/ui_fixtures.py): the Work
+ * Log, no end-time column, a single date-range column, ambiguous columns, an empty database,
+ * and a saved mapping whose columns then changed in Notion.
+ */
+export const reviews = fixtures as unknown as Record<
+  "workLog" | "noEnd" | "range" | "ambiguous" | "empty" | "changed",
+  MappingReview
+>;
 
 export const appInfo: AppInfo = {
   name: "Habit Tracker",
@@ -36,6 +48,8 @@ export const disconnected: ConnectionInfo = {
   database_id: null,
   data_source_id: null,
   database_title: null,
+  mapping_saved: false,
+  full_sync_required: null,
 };
 
 export const connectedNoDatabase: ConnectionInfo = {
@@ -51,6 +65,14 @@ export const connectedWithDatabase: ConnectionInfo = {
   database_id: "db-1",
   data_source_id: "ds-1",
   database_title: "Work Log (test)",
+  mapping_saved: true,
+};
+
+/** A database is chosen but its columns aren't mapped yet: the mapping screen shows. */
+export const connectedUnmapped: ConnectionInfo = {
+  ...connectedWithDatabase,
+  database_title: "Work Log",
+  mapping_saved: false,
 };
 
 export const twoDatabases: DataSourcePage = {
@@ -116,6 +138,10 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
     ),
     list_data_sources: vi.fn(() => ok(twoDatabases)),
     choose_data_source: vi.fn(() => ok(connectedWithDatabase)),
+    get_mapping_review: vi.fn(() => ok(reviews.workLog)),
+    save_mapping: vi.fn<PythonApi["save_mapping"]>(() =>
+      ok({ changed: false, full_sync_required: null }),
+    ),
     open_external: vi.fn(() => ok(null)),
   };
   // Overrides replace the default behaviour but stay spies, so tests can assert on calls

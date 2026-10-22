@@ -490,6 +490,7 @@ def test_reader_has_no_write_methods() -> None:
         "search_data_sources",
         "retrieve_database",
         "retrieve_data_source",
+        "query_data_source",
         "close",
     }
 

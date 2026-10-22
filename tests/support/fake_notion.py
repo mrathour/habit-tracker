@@ -35,6 +35,10 @@ class FakeDataSource:
     id: str
     name: str
     database_id: str
+    #: The schema, as ``properties`` in Notion's data source object (keyed by column name).
+    properties: dict[str, Any] = field(default_factory=dict)
+    #: Rows, as page objects, oldest first.
+    pages: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -102,7 +106,8 @@ class FakeNotion:
         token = auth.removeprefix("Bearer ")
         if token not in self.valid_tokens:
             return notion_error(401, "unauthorized", "API token is invalid.")
-        if request.method != "GET" and not (request.method == "POST" and path == "/v1/search"):
+        read_only_post = path == "/v1/search" or re.fullmatch(r"/v1/data_sources/[^/]+/query", path)
+        if request.method != "GET" and not (request.method == "POST" and read_only_post):
             return notion_error(403, "restricted_resource", "The fake Notion is read-only.")
         return self._api(request, path)
 
@@ -139,6 +144,11 @@ class FakeNotion:
             if database is None or database.id in self.unshared | self.unreadable_databases:
                 return notion_error(404, "object_not_found")
             return httpx.Response(200, json=self.database_json(database))
+        if match := re.fullmatch(r"/v1/data_sources/([^/]+)/query", path):
+            source = self.data_sources.get(match[1])
+            if source is None or source.database_id in self.unshared:
+                return notion_error(404, "object_not_found")
+            return self._query(source, json.loads(request.content or b"{}"))
         if match := re.fullmatch(r"/v1/data_sources/([^/]+)", path):
             source = self.data_sources.get(match[1])
             if source is None or source.database_id in self.unshared:
@@ -159,6 +169,28 @@ class FakeNotion:
             json={
                 "object": "list",
                 "results": [self.data_source_json(s) for s in page],
+                "has_more": more,
+                "next_cursor": str(start + size) if more else None,
+                "type": "page_or_data_source",
+            },
+        )
+
+    def _query(self, source: FakeDataSource, body: dict[str, Any]) -> httpx.Response:
+        rows = list(source.pages)
+        sorts = body.get("sorts") or []
+        if sorts:
+            if sorts != [{"timestamp": "created_time", "direction": "descending"}]:
+                return notion_error(400, "validation_error", "the fake sorts only created_time")
+            rows.sort(key=lambda page: str(page.get("created_time")), reverse=True)
+        start = int(body.get("start_cursor") or 0)
+        size = min(int(body.get("page_size", 100)), 100)
+        page = rows[start : start + size]
+        more = start + size < len(rows)
+        return httpx.Response(
+            200,
+            json={
+                "object": "list",
+                "results": page,
                 "has_more": more,
                 "next_cursor": str(start + size) if more else None,
                 "type": "page_or_data_source",
@@ -188,7 +220,7 @@ class FakeNotion:
                 {"type": "text", "plain_text": source.name, "text": {"content": source.name}}
             ],
             "parent": {"type": "database_id", "database_id": source.database_id},
-            "properties": {},
+            "properties": source.properties,
         }
 
     # --- OAuth (used behind the token service in end-to-end tests) -------------------------

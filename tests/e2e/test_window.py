@@ -129,6 +129,7 @@ def test_connect_with_a_personal_access_token(tmp_path: Path) -> None:
     assert "Work Log (test)" in results["first_picker"]
     assert "Reading has 2 data sources" in results["first_picker"]
     assert "Mayank's personal access token" in results["first_topbar"]
+    assert results["first_mapping_end"] == "End Time · Date"
     assert "connected and reads Work Log (test)" in results["first_home"]
     assert results["first_keyring"] == 1
     assert "Connected with a personal access token" in results["first_settings"]
@@ -170,3 +171,34 @@ def test_declining_in_notion_is_reported_at_once(tmp_path: Path) -> None:
     assert "Access wasn't allowed" in results["notice"]
     assert "Sign-in cancelled" in results["browser_pages"][-1]["text"]
     assert results["keyring"] == 0
+
+
+@pytest.mark.skipif(not (ui_dist_dir() / "index.html").is_file(), reason="UI not built")
+def test_column_mapping(tmp_path: Path) -> None:
+    results, log = run_harness(tmp_path, "mapping")
+    # No end-time column: the exact explanation, and saving is blocked.
+    row = results["no_end_row"]
+    assert "Your database needs a second Date column to use as the end time." in row
+    assert "choose “End of the date range in “Start Time”” for End time." in row
+    assert "End time:" in results["no_end_blockers"]
+    assert results["no_end_save_disabled"] is True
+    # The Work Log maps with no changes, and shows its real values.
+    assert results["fields"] == {
+        "start": "Start Time · Date",
+        "end": "End Time · Date",
+        "task_name": "Name · Title",
+        "parent_task": "Parent Task · Relation",
+        "display_id": "ID · ID",
+        "logged_minutes": "MinuteSpent · Number",
+    }
+    assert results["samples"]["logged_minutes"].split() == ["37", "128", "2"]
+    assert results["samples"]["display_id"].split() == ["8", "7", "6"]
+    assert "Writing EVA resume" in results["samples"]["task_name"]
+    assert "1 linked page" in results["samples"]["parent_task"]
+    assert "2026" in results["samples"]["start"]
+    assert "Column mapping saved." in results["saved_home"]
+    # Changing the saved mapping records that a full sync is required.
+    assert "Mapping saved: a full sync is needed" in results["changed_home"]
+    assert "Full sync required" in results["settings"]
+    assert "Saved the column mapping (changed; full sync required)" in log
+    assert "ntn_" not in log

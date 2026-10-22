@@ -3,7 +3,7 @@ import type { ErrorCode } from "../bridge/types";
 import { describeError } from "../errors/reporting";
 
 /** What the screen can offer to fix a problem. */
-export type ProblemAction = "reconnect" | "paste_token" | "retry" | "use_token";
+export type ProblemAction = "reconnect" | "paste_token" | "retry" | "use_token" | "choose_database";
 
 export interface Problem {
   code: ErrorCode | "unknown";
@@ -32,6 +32,13 @@ const TITLES: Partial<
   },
   notion_error: { title: "Notion refused the request", tone: "error", actions: ["retry"] },
   not_connected: { title: "Not connected to Notion", tone: "warn", actions: ["reconnect"] },
+  no_database: { title: "No work log chosen", tone: "warn", actions: ["choose_database"] },
+  source_unavailable: {
+    title: "Your work log can't be opened",
+    tone: "error",
+    actions: ["choose_database", "retry"],
+  },
+  mapping_invalid: { title: "The mapping can't be saved", tone: "error", actions: [] },
 };
 
 /** Turn any failed call into what the screen should say and offer. */

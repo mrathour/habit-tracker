@@ -927,3 +927,238 @@ a {
   margin-bottom: 8px;
   padding: 0;
 }
+
+/* --- Column mapping (MappingView) ------------------------------------------------------- */
+
+.column[data-width="mapping"] {
+  max-width: 920px;
+}
+
+.mapping-section {
+  display: grid;
+  gap: 12px;
+}
+
+.mapping-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mapping-section-head h2 {
+  font-size: 17px;
+}
+
+.mapping-fields,
+.extra-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.mapping-fields > li + li,
+.extra-list > li + li {
+  border-top: 1px solid var(--rule);
+}
+
+.mapping-field {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-left: 3px solid transparent;
+}
+
+.mapping-field[data-status="choose"],
+.mapping-field[data-status="removed"],
+.mapping-field[data-status="type_changed"] {
+  border-left-color: var(--amber);
+}
+
+.mapping-field[data-status="missing"] {
+  border-left-color: var(--red);
+}
+
+.mapping-field-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mapping-label {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.badge.required {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--rule));
+}
+
+.chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.facts .chip {
+  margin-left: 10px;
+}
+
+.chip.ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.chip.warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.chip.error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.mapping-field-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .mapping-field-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mapping-choice {
+  display: grid;
+  gap: 6px;
+}
+
+.select {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.hint,
+.warn-text {
+  color: var(--amber);
+}
+
+.samples {
+  display: grid;
+  gap: 6px;
+  min-height: 38px;
+  align-content: center;
+}
+
+.sample-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sample {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: var(--radius-control);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sample.warn {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--rule));
+}
+
+.sample-tag {
+  font-size: 11px;
+  color: var(--amber);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.field-note.error {
+  color: var(--red);
+}
+
+.field-note.warn {
+  color: var(--amber);
+}
+
+.issue-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.extra-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 8px 16px;
+  padding: 12px 18px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .extra-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.extra-row.unusable .extra-name {
+  color: var(--muted);
+}
+
+.extra-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.extra-row.unusable .extra-label {
+  cursor: default;
+}
+
+.extra-label input {
+  accent-color: var(--green);
+  margin: 0;
+}
+
+.extra-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.extra-detail {
+  display: grid;
+  gap: 4px;
+}

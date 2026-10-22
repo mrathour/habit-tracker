@@ -33,6 +33,7 @@ from app.error_page import render_error_page
 from app.errors import AppError, ErrorReport, install_excepthooks, report_exception
 from app.events import EventChannel
 from app.log import adopt_pywebview_logger, configure_logging
+from app.mapping.review import MappingService
 from app.notion.client import DEFAULT_NOTION_URL, NOTION_URL_ENV_VAR, NotionReader
 from app.notion.connection import ConnectionService
 from app.notion.credentials import CredentialStore
@@ -179,26 +180,30 @@ class UiReadyWatchdog:
                 self._armed = False
 
 
-def build_connection(
+def build_services(
     paths: AppPaths, database: Database, events: EventChannel
-) -> ConnectionService:
-    """Wire the Notion connection: Credential Manager, token service, reader and settings."""
+) -> tuple[ConnectionService, MappingService]:
+    """Wire the Notion connection (Credential Manager, token service, reader and settings) and
+    the column mapping, which shares its reader and settings."""
     service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
     notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
     tokens = TokenManager(CredentialStore(paths.credential_account), service)
+    settings = Settings(database.connection)
 
     def make_reader(manager: TokenManager) -> NotionReader:
         return NotionReader(manager, base_url=notion_url)
 
-    return ConnectionService(
+    reader = make_reader(tokens)
+    connection = ConnectionService(
         tokens=tokens,
-        reader=make_reader(tokens),
+        reader=reader,
         service=service,
-        settings=Settings(database.connection),
+        settings=settings,
         db=database.connection,
         emit=events.emit,
         make_reader=make_reader,
     )
+    return connection, MappingService(tokens=tokens, reader=reader, settings=settings)
 
 
 def run_window(
@@ -218,13 +223,17 @@ def run_window(
     mode: Mode = "dev" if args.dev else "normal"
     events = EventChannel()
     startup = prepare(args, paths)
+    connection, mapping = (
+        build_services(paths, startup.database, events) if startup.database else (None, None)
+    )
     context = AppContext(
         mode=mode,
         paths=paths,
         database=startup.database,
         events=events,
         diagnostics=args.dev or args.diagnostics,
-        connection=build_connection(paths, startup.database, events) if startup.database else None,
+        connection=connection,
+        mapping=mapping,
     )
     install_excepthooks(lambda report: events.emit("app:error", report.to_dict()))
 

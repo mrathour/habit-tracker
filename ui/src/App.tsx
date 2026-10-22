@@ -9,6 +9,7 @@ import { WorkspaceBadge } from "./components/WorkspaceBadge";
 import { useConnection } from "./connection/useConnection";
 import { ConnectView } from "./views/ConnectView";
 import { HomeView } from "./views/HomeView";
+import { MappingView } from "./views/MappingView";
 import { PickerView } from "./views/PickerView";
 import { SettingsView } from "./views/SettingsView";
 
@@ -23,6 +24,8 @@ const DISCONNECTED: ConnectionInfo = {
   database_id: null,
   data_source_id: null,
   database_title: null,
+  mapping_saved: false,
+  full_sync_required: null,
 };
 
 export function App() {
@@ -30,7 +33,9 @@ export function App() {
   const connection = useConnection();
   const [view, setView] = useState<View>("home");
   const [choosing, setChoosing] = useState(false);
+  const [mapping, setMapping] = useState(false);
   const [focusAdvanced, setFocusAdvanced] = useState(false);
+  const [mappingSaved, setMappingSaved] = useState<{ fullSync: boolean } | null>(null);
 
   // Tell Python the page's event listeners are attached. Child effects run first, so every
   // hook above has subscribed by now and no pushed event is missed.
@@ -46,8 +51,24 @@ export function App() {
   const go = (next: View) => {
     setView(next);
     setChoosing(false);
+    setMapping(false);
     setFocusAdvanced(false);
+    setMappingSaved(null);
   };
+
+  const pasteNewToken = () => {
+    setView("settings");
+    setMapping(false);
+    setFocusAdvanced(true);
+  };
+
+  const chooseDatabase = () => {
+    setView("home");
+    setMapping(false);
+    setChoosing(true);
+  };
+
+  const ready = info?.connected && !choosing && info.data_source_id;
 
   return (
     <div className="app">
@@ -120,9 +141,11 @@ export function App() {
               connection.setInfo(updated ?? { ...DISCONNECTED });
               if (updated === null) connection.reload();
             }}
-            onChangeDatabase={() => {
+            onChangeDatabase={chooseDatabase}
+            onReviewMapping={() => {
               setView("home");
-              setChoosing(true);
+              setMappingSaved(null);
+              setMapping(true);
             }}
           />
         )}
@@ -143,17 +166,36 @@ export function App() {
                   }
                 : undefined
             }
-            onPasteNewToken={() => {
-              setView("settings");
-              setFocusAdvanced(true);
-            }}
+            onPasteNewToken={pasteNewToken}
           />
         )}
-        {info && view === "home" && info.connected && !choosing && info.data_source_id && (
+        {info && view === "home" && ready && (mapping || !info.mapping_saved) && (
+          <MappingView
+            info={info}
+            onSaved={(updated, result) => {
+              connection.setInfo(updated);
+              setMapping(false);
+              setMappingSaved({ fullSync: result.changed });
+            }}
+            onCancel={
+              info.mapping_saved
+                ? () => {
+                    setMapping(false);
+                  }
+                : undefined
+            }
+            onChooseDatabase={chooseDatabase}
+            onPasteNewToken={pasteNewToken}
+          />
+        )}
+        {info && view === "home" && ready && !mapping && info.mapping_saved && (
           <HomeView
             info={info}
-            onChangeDatabase={() => {
-              setChoosing(true);
+            justSaved={mappingSaved}
+            onChangeDatabase={chooseDatabase}
+            onReviewMapping={() => {
+              setMappingSaved(null);
+              setMapping(true);
             }}
           />
         )}

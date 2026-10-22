@@ -23,7 +23,14 @@ from typing import Any, Final, Literal, TypedDict
 
 import httpx
 
-from app.db.settings import CONNECTION_KEYS, SOURCE_DATA_KEYS, SOURCE_KEYS, Settings
+from app.db.settings import (
+    CONNECTION_KEYS,
+    FULL_SYNC_REQUIRED_KEY,
+    MAPPING_KEY,
+    SOURCE_DATA_KEYS,
+    SOURCE_KEYS,
+    Settings,
+)
 from app.errors import AppError
 from app.notion.client import NotionReader
 from app.notion.credentials import AuthKind, StoredCredential, utc_now
@@ -63,6 +70,10 @@ class ConnectionInfo(TypedDict):
     database_id: str | None
     data_source_id: str | None
     database_title: str | None
+    #: A column mapping is saved for the chosen data source (PLAN.md 4).
+    mapping_saved: bool
+    #: Set when the mapping changed after its first save; a full sync clears it (Phase 5).
+    full_sync_required: dict[str, str] | None
 
 
 class DataSourceChoice(TypedDict):
@@ -164,6 +175,8 @@ class ConnectionService:
             "database_id": self._settings.get_str("database_id"),
             "data_source_id": self._settings.get_str("data_source_id"),
             "database_title": self._settings.get_str("database_title"),
+            "mapping_saved": self._settings.get(MAPPING_KEY) is not None,
+            "full_sync_required": _flag(self._settings.get(FULL_SYNC_REQUIRED_KEY)),
         }
 
     # --- pasted tokens (12.4) -------------------------------------------------------------
@@ -534,6 +547,12 @@ def _identity(me: dict[str, Any]) -> dict[str, str | None]:
         "workspace_id": None,
         "account_name": person_name if isinstance(person_name, str) else None,
     }
+
+
+def _flag(value: object) -> dict[str, str] | None:
+    if isinstance(value, dict) and all(isinstance(value.get(k), str) for k in ("since", "reason")):
+        return {"since": value["since"], "reason": value["reason"]}
+    return None
 
 
 def _is_icon(value: object) -> bool:

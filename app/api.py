@@ -29,6 +29,7 @@ from app.events import EventChannel
 from app.paths import AppPaths
 
 if TYPE_CHECKING:
+    from app.mapping.review import MappingReview, MappingService, SaveResult
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ class AppContext:
     on_ui_ready: Callable[[], None] | None = None
     open_folder: Callable[[Path], None] = field(default=lambda path: _open_in_explorer(path))
     connection: ConnectionService | None = None
+    mapping: MappingService | None = None
     open_url: Callable[[str], object] = field(default=lambda url: _open_in_browser(url))
 
 
@@ -226,6 +228,22 @@ class Api:
         self, database_id: object, data_source_id: object, confirm_replace: object = False
     ) -> ConnectionInfo:
         return self._connection().choose_data_source(database_id, data_source_id, confirm_replace)
+
+    # --- Column mapping (PLAN.md 4) ------------------------------------------------------
+
+    def _mapping(self) -> MappingService:
+        if self._ctx.mapping is None:
+            raise AppError("The column mapping isn't available because the app didn't start.")
+        return self._ctx.mapping
+
+    @bridge_method
+    def get_mapping_review(self) -> MappingReview:
+        """The chosen database's columns with sample values, and each app field's column."""
+        return self._mapping().review()
+
+    @bridge_method
+    def save_mapping(self, fields: object, extra: object) -> SaveResult:
+        return self._mapping().save(fields, extra)
 
     @bridge_method
     def open_external(self, url: object) -> None:

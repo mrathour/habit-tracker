@@ -37,7 +37,7 @@ A Windows desktop app that tracks a work habit: time spent working. The user log
 
 | Notion column | Notion type | Example |
 |---|---|---|
-| № ID | Unique ID | 6 |
+| ID (Notion shows it as № ID) | Unique ID | 6 |
 | Name | Title | "Work Log Table Created" (may be blank) |
 | Start Time | Date with time | October 17, 2026 5:41 PM |
 | End Time | Date with time | October 17, 2026 5:43 PM |
@@ -54,7 +54,7 @@ Task names are often blank at first and renamed later. **Parent Task** keeps ent
 |---|---|---|---|
 | Notion page ID | built in | Automatic | The internal primary key. No mapping needed. |
 | Start time | date | **Required** | Must include a time. |
-| End time | date | **Required** | Must include a time. |
+| End time | date, or the end of a date range in the Start time column | **Required** | Must include a time. |
 | Task name | title, rich_text | Optional | Shown as "Untitled" when blank. Never flagged. |
 | Parent task link | relation | Optional, recommended | Stored as the related page ID; shown as a clickable Notion link. |
 | Display ID | unique_id, number | Optional | A friendly label in the raw log. |
@@ -68,7 +68,17 @@ Task names are often blank at first and renamed later. **Parent Task** keeps ent
 - **The review screen** shows each app field with the Notion column it's mapped to. The user can change any mapping, or set an optional field to "Not used". Only columns of compatible types are offered for each field.
 - **Missing required fields:** if a required field has no compatible column, setup cannot finish. The screen explains exactly what is missing, for example: "Your database needs a second date column to use as the end time."
 - **Extra fields:** an "Additional fields" section lists every unmapped column. Ticked columns are synced and shown in the raw log, with filters appropriate to their type.
-- **Adding or changing mappings after setup** automatically triggers a full sync, so existing entries get the new data.
+- **Adding or changing mappings after setup** automatically triggers a full sync, so existing entries get the new data. Saving a changed mapping sets the `full_sync_required` setting (11), which the app shows on Home and Settings; a full sync clears it. Saving an unchanged mapping, and the first save, don't set it.
+- **Matching details** (Phase 4):
+  - Names are split at spaces, symbols and camelCase (`MinuteSpent` → "minute spent") and compared by keyword in three tiers: a whole word or phrase, a word that begins with a keyword, then a near spelling.
+  - Within a field, an earlier type wins: the title over a text column, a unique ID over a number, a number over a formula.
+  - Each column feeds at most one field; the only exception is a date range (below).
+  - Optional fields are filled only with evidence: a matching name, or a type that identifies the field on its own (the title, the only unique ID, the only relation). A number with no telling name is never guessed to be Logged minutes or Display ID.
+  - **Ties are never guessed.** When the best candidates for a field are equally good, the field is marked **Please choose** with those candidates and nothing selected. Saving is blocked until each one is answered; for an optional field, "Not used" is an answer.
+  - A formula's result type isn't in the schema, so it counts as a number for Logged minutes unless the sample rows show another type.
+- **Date ranges.** One date column can hold each session as a range (Start → End). End time's choices always include "End of the date range in ‹Start column›". It is chosen automatically only when no date column has an end-like name, Start time matched a single column, and the sample rows show that column holding ranges. It is stored as the same property ID with `part: "end"`, and follows Start time if Start moves to another column.
+- **Sample values.** The review screen reads the 25 most recently created rows (one read-only query) and shows up to three non-empty values per column, in local time. A database with no rows maps from the schema alone. Dates without a time are marked, because validation will flag them. Relations show a count of linked pages and people a count, since neither their titles nor names are read.
+- **Columns that can't be used** (buttons, Notion's `unsupported` type, and any type newer than the app) are listed under Additional fields with the reason and a disabled checkbox.
 
 ## 5. Validation (never blocks sync)
 
@@ -84,6 +94,8 @@ Validation is informational only. Every entry is imported, and its issues are st
 In the raw log, each affected cell turns red, and hovering over it shows a plain explanation, for example: "Logged 148 min, but Start → End is 123 min." A "Has issues" filter shows only flagged entries. The dashboard shows a small count of flagged entries that links to that filtered view.
 
 Blank task names are **not** an issue.
+
+**Date ranges** (4.2): when End time is the end of the Start column's range, Start is the range's start and End its end, both converted with the property's `time_zone`. The rules above apply unchanged: an entry whose date has no end, or whose start or end has no time, is a Missing time issue; an end before the start is an Invalid range.
 
 ## 6. Sync engine
 
@@ -135,7 +147,7 @@ Quick sync catches new entries and edits, including renamed tasks. It does **not
   - **Offset** (`Z`, `+05:30`): convert directly to UTC.
   - **No offset, with `time_zone`:** localize with `zoneinfo.ZoneInfo(time_zone)`, then convert to UTC.
   - **Date only:** this is the Missing time issue (5).
-  - **Range** (an `end` inside one mapped date property): ignored. Each app field reads only `start`.
+  - **Range** (an `end` inside one mapped date property): each app field reads the part its mapping names, `start` unless End time is mapped to the end of the Start column's range (4.2).
 
 ## 7. Dashboard
 
@@ -250,7 +262,7 @@ Indexes on `start_utc` and `parent_task_id`.
 **`settings`** is a key–value table (`key TEXT PRIMARY KEY, value TEXT` holding JSON). Its keys are:
 - **Notion source:** `database_id`, `data_source_id`, `database_title`;
 - **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`, `workspace_icon` (`{type: "emoji" | "image", value}`; images are stored as a data URI), `account_name` (the person behind a personal access token);
-- **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
+- **Mapping:** `mapping`, version 1: `fields` (app field → `{property_id, part?}` or null for Not used; `part` is `start` or `end` for the date fields), `extra` (property IDs), `names_at_save` (property ID → column name, used only to word messages) and `saved_at`. Mappings are found by property ID only. `full_sync_required` (`{since, reason}`) is set when a saved mapping changes and cleared by a full sync;
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
 - **Policy:** `acknowledged_policy_version` (13);
 - **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`.
@@ -434,8 +446,8 @@ habit-tracker/
 │   ├── devserver.py         # Vite dev server for dev mode
 │   ├── single_instance.py   # one running copy per data folder (named mutex)
 │   ├── notion/              # handoff, loopback listener, credentials, tokens (renewal), service client, read-only client, connection (connect, picker, logout); later: pagination, property readers
-│   ├── sync/                # quick sync, full sync, schema check
-│   ├── mapping/             # auto-matcher, extra fields
+│   ├── sync/                # schema check (Phase 4); quick sync, full sync (Phase 5)
+│   ├── mapping/             # property types and samples, auto-matcher, saved mapping, review service
 │   ├── validation/          # entry checks
 │   ├── stats/               # daily totals, weeks, streaks, midnight split
 │   └── db/                  # connections, migrator, migrations/*.sql, settings, queries
@@ -456,7 +468,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 1. Explore the extension | Read the Chrome extension at `C:\Users\LENOVO\Documents\JS\myNotionNotes` without modifying it. Document its auth flow, Notion API calls, pagination and error handling in `docs/extension-notes.md`. Propose the auth design. | The user approves the notes and the auth design. |
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
 | 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | **(a)** With a personal access token, the user connects, sees their workspace, picks their Work Log, logs out and reconnects; all CI checks pass. **(b)** The token service is deployed and its tests pass. **(c)** OAuth sign-in from the app works end to end. **(d)** OAuth sign-in from the app also works for a second Notion workspace that doesn't own the integration; if Notion blocks it pending review, what the review requires is recorded here. |
-| 4. Map | Build auto-matching, the review screen, extra-field selection, and missing-required-field errors. | The author's Work Log maps correctly, and a fixture schema missing an end-time column shows a clear error (covered by tests and viewable in the UI with that fixture). |
+| 4. Map | Build schema reading, auto-matching (including a single date-range column), the review screen with sample values, extra-field selection, missing-required-field errors, saving and reopening the mapping with the full-sync-required flag, and the reusable schema check (6.3). | The author's Work Log maps correctly with no manual changes and shows correct sample values; Work Log (test) maps correctly; a real Notion database with no end-time column shows the exact missing-field explanation; all CI checks pass. |
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
 | 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
@@ -604,3 +616,9 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-20 | Phase 3 UI: the app's visual style is a time sheet: Bahnschrift for headings and figures, Segoe UI Variable for text, ledger green `#2f6f5e` on a cool grey. No web fonts, so the CSP stays strict and the UI works offline. The Connect screen's hero is a week of sessions on a 24-hour strip. |
 | 2026-10-20 | Phase 3 testing: end-to-end window tests run against a fake Notion served over HTTP. For OAuth they also run the real token service locally with `wrangler dev`, with a scripted browser following the real redirects. Every test uses an in-memory keyring. The token service gets its own CI job and Dependabot entry, and pre-commit hooks for `service/`. |
 | 2026-10-22 | Phase 3 approved. The user ran checks (a), (b) and (c). Check (d), signing in from a second Notion account, was **accepted by the user's decision without being verified**. "No review needed" is confirmed live only for the author's own workspace. If sign-in from another workspace is ever blocked, it is handled then (see Open items). |
+| 2026-10-22 | Phase 4: a single date column holding a range (Start → End) can supply both Start time and End time. It is chosen automatically only when no date column has an end-like name, Start matched one column and the sample rows show ranges; otherwise "End of the date range in ‹Start column›" is offered by hand. It is stored as the same property ID with `part: "end"`. Validation (5) applies unchanged, and 6.4's range rule now reads the part each mapping names. |
+| 2026-10-22 | Phase 4: when two or more columns fit a field equally well, the field is marked "Please choose" with nothing selected, and saving is blocked until it is answered ("Not used" counts for optional fields). Optional fields are filled automatically only with evidence (a telling name, or a type that identifies the field on its own). Each column feeds one field, except a date range. |
+| 2026-10-22 | Phase 4: the review screen samples the 25 most recently created rows with one read-only query and shows up to three values per column in local time. A formula's result type is read from those samples. Buttons, `unsupported` and unknown property types are listed with the reason they can't be used. |
+| 2026-10-22 | Phase 4: new setting `full_sync_required` (`{since, reason}`), set when a saved mapping changes (not on the first save or an unchanged save), shown on Home, Settings and the mapping screen, and cleared with the database's other data when switching databases. Phase 5's full sync clears it. The `mapping` setting's shape is recorded in 11. |
+| 2026-10-22 | Phase 4 "Done when" updated: besides the tests, a real Notion database with no end-time column (created by the user) must show the exact missing-field explanation, and Work Log (test) must map correctly. This supersedes the 2026-10-17 row saying there is no separate no-end-time database; the pytest fixtures stay. |
+| 2026-10-22 | Phase 4: `tzdata` added as a dependency (planned in 10). The author's Work Log schema was checked in Notion: its ID column is named "ID" (Notion shows unique IDs as "№ ID"); section 3 updated. The UI's mapping test fixtures are generated from the Python service, and a pytest check keeps them in step. |

@@ -117,6 +117,25 @@ class NotionReader:
             lambda auth: self._client.data_sources.retrieve(data_source_id, auth=auth)
         )
 
+    def query_data_source(
+        self,
+        data_source_id: str,
+        *,
+        page_size: int = 100,
+        start_cursor: str | None = None,
+        sorts: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        """One page of rows: ``POST /v1/data_sources/{id}/query`` (a read, despite the POST)."""
+        body: dict[str, Any] = {"page_size": page_size}
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+        if sorts:
+            body["sorts"] = sorts
+        return self._call(
+            lambda auth: self._client.data_sources.query(data_source_id, auth=auth, **body),
+            post=True,
+        )
+
     # --- plumbing -------------------------------------------------------------------------
 
     def _call(self, request: Callable[[str], Any], *, post: bool = False) -> dict[str, Any]:
