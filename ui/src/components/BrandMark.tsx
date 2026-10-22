@@ -1,22 +1,35 @@
-/** The app icon (service/pages/icon.png) drawn as SVG: a rising week of daily totals. */
+/**
+ * The app icon (packaging/icon/app-icon.svg) drawn inline: a clock whose ring fills like a
+ * daily goal. Keep the two in step.
+ */
 export function BrandMark() {
-  const bars = [
-    { x: 82, h: 96 },
-    { x: 156, h: 152 },
-    { x: 230, h: 120 },
-    { x: 304, h: 208 },
-    { x: 378, h: 272 },
-  ];
   return (
-    <svg className="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
-      <rect width="512" height="512" rx="104" fill="#2f6f5e" />
-      {bars.map((bar) => (
-        <g key={bar.x} fill="#ffffff">
-          {/* Rounded top, square base. */}
-          <rect x={bar.x} y={392 - bar.h} width="52" height={bar.h} rx="26" />
-          <rect x={bar.x} y={366} width="52" height="26" />
-        </g>
-      ))}
+    <svg className="brand-mark" viewBox="0 0 256 256" aria-hidden="true">
+      <rect width="256" height="256" rx="56" fill="#2f6f5e" />
+      <circle
+        cx="128"
+        cy="128"
+        r="78"
+        fill="none"
+        stroke="#dcebe5"
+        strokeOpacity=".28"
+        strokeWidth="26"
+      />
+      <path
+        d="M128 50 A78 78 0 1 1 50 128"
+        fill="none"
+        stroke="#dcebe5"
+        strokeWidth="26"
+        strokeLinecap="round"
+      />
+      <path
+        d="M128 128 L128 88 M128 128 L156 146"
+        fill="none"
+        stroke="#f0c36b"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <circle cx="128" cy="128" r="12" fill="#f0c36b" />
     </svg>
   );
 }

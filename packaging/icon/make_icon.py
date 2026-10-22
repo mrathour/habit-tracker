@@ -1,4 +1,4 @@
-"""Build ``app-icon.ico`` from ``app-icon.svg`` (PLAN.md 13).
+"""Build ``app-icon.ico`` and the website icon from ``app-icon.svg`` (PLAN.md 13).
 
 Each size is drawn by Microsoft Edge in headless mode, so small sizes get the browser's own
 anti-aliasing, and stored as a PNG image inside the ``.ico`` (supported since Windows Vista).
@@ -20,6 +20,9 @@ HERE = Path(__file__).resolve().parent
 SVG = HERE / "app-icon.svg"
 ICO = HERE / "app-icon.ico"
 PNG = HERE / "app-icon.png"
+#: The website's icon and the Notion integration's logo (docs/notion-integration.md).
+SERVICE_ICON = HERE.parent.parent / "service" / "pages" / "icon.png"
+SERVICE_ICON_SIZE = 512
 SIZES = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
 EDGE_CANDIDATES = (
     Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
@@ -85,10 +88,13 @@ def main() -> int:
     edge = find_edge()
     with tempfile.TemporaryDirectory() as tmp:
         images = [(size, render(edge, size, Path(tmp))) for size in SIZES]
+        service_icon = render(edge, SERVICE_ICON_SIZE, Path(tmp))
     ICO.write_bytes(build_ico(images))
     PNG.write_bytes(images[-1][1])
+    SERVICE_ICON.write_bytes(service_icon)
     sys.stdout.write(
-        f"Wrote {ICO.name} ({', '.join(str(s) for s, _ in images)} px) and {PNG.name}\n"
+        f"Wrote {ICO.name} ({', '.join(str(s) for s, _ in images)} px), {PNG.name} "
+        f"and {SERVICE_ICON.relative_to(HERE.parent.parent)}\n"
     )
     return 0
 
