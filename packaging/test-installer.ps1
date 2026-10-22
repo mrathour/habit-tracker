@@ -10,7 +10,7 @@
     Checks:
       1. A silent install puts the app in %LOCALAPPDATA%\Programs\Habit Tracker with Start Menu
          and desktop shortcuts and an uninstall entry, and the installed app passes
-         --self-check and opens its window.
+         --self-check and opens its window, and Windows Defender finds no threats in it.
       2. Installing again over it (an upgrade) works and replaces the program's files.
       3. The default uninstall removes the program and shortcuts but keeps the data folder and
          the Notion sign-in.
@@ -97,6 +97,25 @@ do {
 Check ([bool]$Ready) "the installed app opens its window and the UI reports ready"
 Stop-Process -Id $Process.Id -Force
 Wait-Process -Id $Process.Id -ErrorAction SilentlyContinue
+
+Step "1b. Windows Defender scan of the installed app"
+$MpCmdRun = Join-Path $env:ProgramFiles "Windows Defender\MpCmdRun.exe"
+if (Test-Path $MpCmdRun) {
+    $Scan = & $MpCmdRun -Scan -ScanType 3 -File $AppDir -DisableRemediation | Out-String
+    Write-Host $Scan.Trim()
+    if ($Scan -match "found no threats") {
+        Check $true "Windows Defender found no threats"
+    }
+    elseif ($Scan -match "found \d+ threats?") {
+        throw "FAILED: Windows Defender flagged the installed app. See the scan output above."
+    }
+    else {
+        Write-Warning "Windows Defender couldn't scan here (exit code $LASTEXITCODE); not counted as a failure."
+    }
+}
+else {
+    Write-Warning "Windows Defender isn't available on this machine; scan skipped."
+}
 
 Step "2. Upgrade in place"
 $Stale = Join-Path $AppDir "_internal\stale-file-from-old-version.txt"
