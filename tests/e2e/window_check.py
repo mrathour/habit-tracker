@@ -16,7 +16,9 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
   disconnect, and reconnect;
 * ``connect-oauth``: "Connect to Notion" through a local token service (``wrangler dev``) and
   a fake Notion, with a scripted browser following the real redirects; then disconnect;
-* ``connect-oauth-deny``: the same, declining access in "Notion".
+* ``connect-oauth-deny``: the same, declining access in "Notion";
+* ``mapping``: the column mapping screen: a database with no end-time column, then the Work
+  Log's automatic mapping, saving, reopening and changing it (full sync required).
 
 Results are written as JSON; the process exits 0 even when a check fails, so the test can
 report every finding.
@@ -48,6 +50,7 @@ from app.notion.service_client import SERVICE_URL_ENV_VAR
 from app.paths import AppPaths
 from tests.support.fake_notion_server import FakeNotionServer
 from tests.support.memory_keyring import MemoryKeyring
+from tests.support.notion_schemas import add_source, without, work_log_rows, work_log_schema
 
 TIMEOUT_S = 30.0
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -119,6 +122,32 @@ def text(window: Any, selector: str) -> str | None:
         f"document.querySelector({json.dumps(selector)})?.innerText ?? null"
     )
     return str(result) if result is not None else None
+
+
+def select_option(window: Any, selector: str, label: str) -> None:
+    """Choose an option of a React-controlled <select> by its text, the way a user does."""
+    found = window.evaluate_js(
+        f"(() => {{ const el = document.querySelector({json.dumps(selector)});"
+        " if (!el) return false;"
+        f" const option = [...el.options].find((o) => o.textContent === {json.dumps(label)});"
+        " if (!option) return false;"
+        " const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;"
+        " set.call(el, option.value);"
+        " el.dispatchEvent(new Event('change', { bubbles: true })); return true; })()"
+    )
+    if not found:
+        raise LookupError(f"No option {label!r} in {selector}")
+
+
+def selected(window: Any, selector: str) -> str | None:
+    result = window.evaluate_js(
+        f"document.querySelector({json.dumps(selector)})?.selectedOptions[0]?.textContent ?? null"
+    )
+    return str(result) if result is not None else None
+
+
+MAPPING_LOADED = "document.querySelector('#field-start') !== null"
+DATABASES_LOADED = "document.querySelector('[aria-label=\"Databases\"]') !== null"
 
 
 def heading_is(title: str) -> str:
@@ -196,6 +225,12 @@ def choose_work_log(window: Any, results: dict[str, Any], prefix: str) -> None:
     snap(f"{prefix}-picker")
     click_label(window, "Work Log (test)")
     click(window, "Use this database")
+    # First time: the columns are mapped automatically and reviewed before the home screen.
+    wait_for(window, heading_is("Map your columns"))
+    wait_for(window, MAPPING_LOADED)
+    results[f"{prefix}_mapping_end"] = selected(window, "#field-end")
+    snap(f"{prefix}-mapping")
+    click(window, "Save mapping")
     wait_for(window, heading_is("Work Log (test)"))
     results[f"{prefix}_home"] = text(window, "main")
     snap(f"{prefix}-home")
@@ -248,6 +283,59 @@ def connect_token(fake: FakeNotionServer) -> Scenario:
         paste_token(window, fake.notion.issue_token())
         wait_for(window, heading_is("Choose your work log"))
         results["after_clear"] = "picker"
+
+    return scenario
+
+
+def mapping(fake: FakeNotionServer) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        paste_token(window, fake.notion.issue_token())
+
+        # A database with no end-time column: the exact explanation, and no way to save.
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log (no end)")
+        click(window, "Use this database")
+        wait_for(window, MAPPING_LOADED)
+        results["no_end_row"] = window.evaluate_js(
+            "document.querySelector('#field-end').closest('li').innerText"
+        )
+        results["no_end_blockers"] = text(window, "[aria-label='Before you can save']")
+        results["no_end_save_disabled"] = window.evaluate_js(
+            "[...document.querySelectorAll('button')]"
+            ".find((b) => b.textContent.trim() === 'Save mapping').disabled"
+        )
+        snap("mapping-no-end")
+
+        # The Work Log copy: every field matched, with its real sample values.
+        click(window, "Choose a different database")
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log (test)")
+        click(window, "Use this database")
+        wait_for(window, heading_is("Map your columns"))
+        wait_for(window, MAPPING_LOADED)
+        keys = ("start", "end", "task_name", "parent_task", "display_id", "logged_minutes")
+        results["fields"] = {key: selected(window, f"#field-{key}") for key in keys}
+        results["samples"] = {key: text(window, f"#field-{key}-samples") for key in keys}
+        snap("mapping-work-log")
+        click(window, "Save mapping")
+        wait_for(window, heading_is("Work Log (test)"))
+        results["saved_home"] = text(window, "main")
+
+        # Reopen, change a field, save: a full sync is now required.
+        click(window, "Review column mapping")
+        wait_for(window, heading_is("Column mapping"))
+        wait_for(window, MAPPING_LOADED)
+        select_option(window, "#field-display_id", "Not used")
+        click(window, "Save mapping")
+        wait_for(window, "document.querySelector('[aria-label=\"Full sync required\"]') !== null")
+        results["changed_home"] = text(window, "[aria-label='Full sync required']")
+        snap("mapping-full-sync")
+        click(window, "Settings")
+        wait_for(window, heading_is("Settings"))
+        results["settings"] = text(window, "[aria-labelledby='settings-connection']")
 
     return scenario
 
@@ -354,7 +442,9 @@ def use_blank_ui(paths: AppPaths) -> None:
 
 def seed_fake_notion(fake: FakeNotionServer) -> None:
     fake.notion.workspace_name = "E2E Workspace"
-    fake.notion.add_database("Work Log (test)")
+    add_source(fake.notion, "Work Log (test)", work_log_schema(), work_log_rows())
+    no_end = without(work_log_schema(), "End Time")
+    add_source(fake.notion, "Work Log (no end)", no_end, work_log_rows(no_end))
     fake.notion.add_database("Reading", ["Books", "Articles"])
 
 
@@ -398,6 +488,11 @@ def main() -> int:
             fake.notion.me_type = "person"
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(connect_token(fake))
+    elif name == "mapping":
+        with FakeNotionServer() as fake:
+            seed_fake_notion(fake)
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            exit_code = open_window(mapping(fake))
     elif name in ("connect-oauth", "connect-oauth-deny"):
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)
