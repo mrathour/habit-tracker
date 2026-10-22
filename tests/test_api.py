@@ -40,6 +40,10 @@ PUBLIC_METHODS = {
     "get_day_detail",
     "get_preferences",
     "set_preferences",
+    "get_raw_log",
+    "set_raw_log_view",
+    "export_raw_log",
+    "show_exported_file",
     "open_external",
 }
 

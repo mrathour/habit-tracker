@@ -31,6 +31,8 @@ from app.paths import AppPaths
 if TYPE_CHECKING:
     from app.mapping.review import MappingReview, MappingService, SaveResult
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
+    from app.rawlog.service import ExportResult, RawLogPage, RawLogService
+    from app.rawlog.view import ViewPrefs
     from app.stats.preferences import Preferences
     from app.stats.service import Dashboard, DayDetail, StatsService
     from app.sync.engine import FlaggedPage, SyncService, SyncStatus
@@ -89,6 +91,10 @@ class AppContext:
     sync: SyncService | None = None
     stats: StatsService | None = None
     open_url: Callable[[str], object] = field(default=lambda url: _open_in_browser(url))
+    rawlog: RawLogService | None = None
+    #: The native Save dialog: a suggested file name in, the chosen path (or None) out.
+    choose_save_path: Callable[[str], str | None] | None = None
+    reveal_file: Callable[[Path], None] = field(default=lambda path: _reveal_in_explorer(path))
 
 
 class Api:
@@ -300,6 +306,36 @@ class Api:
     def set_preferences(self, changes: object) -> Preferences:
         return self._stats().update_preferences(changes)
 
+    # --- Raw log (PLAN.md 8) ----------------------------------------------------------------
+
+    def _rawlog(self) -> RawLogService:
+        if self._ctx.rawlog is None:
+            raise AppError("The raw log isn't available because the app didn't start.")
+        return self._ctx.rawlog
+
+    @bridge_method
+    def get_raw_log(self, request: object) -> RawLogPage:
+        """One page of entries: {time_zone, filters, sort, offset, limit}."""
+        return self._rawlog().page(request)
+
+    @bridge_method
+    def set_raw_log_view(self, changes: object) -> ViewPrefs:
+        """Remember the sort, column widths or hidden columns."""
+        return self._rawlog().update_view(changes)
+
+    @bridge_method
+    def export_raw_log(self, request: object, columns: object) -> ExportResult:
+        """Save the rows on screen as CSV, asking where with the native Save dialog."""
+        choose = self._ctx.choose_save_path
+        if choose is None:
+            raise AppError("Saving files needs the app window, which isn't open.")
+        return self._rawlog().export(request, columns, choose)
+
+    @bridge_method
+    def show_exported_file(self) -> None:
+        """Open Explorer at the file the last export saved."""
+        self._ctx.reveal_file(self._rawlog().last_export())
+
     @bridge_method
     def open_external(self, url: object) -> None:
         """Open a help or Notion link in the default browser. Only known HTTPS sites."""
@@ -310,6 +346,14 @@ class Api:
 
 def _open_in_explorer(path: Path) -> None:
     os.startfile(path)  # noqa: S606 - opens a folder the app owns in Explorer
+
+
+def _reveal_in_explorer(path: Path) -> None:
+    """Open Explorer with ``path`` selected (a file the user just chose to save)."""
+    import subprocess
+
+    # Explorer reads "/select," and the path as one argument; Windows paths can't contain quotes.
+    subprocess.Popen(f'explorer /select,"{path}"')  # noqa: S603 - a path from the Save dialog
 
 
 ALLOWED_EXTERNAL_HOSTS: Final = frozenset(
