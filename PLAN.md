@@ -186,7 +186,7 @@ A "Raw log" tab beside Home and Settings. Rows are filtered, sorted and paged in
   - date, created and edited times: a local date range;
   - formula: by its result type (number, text, checkbox or date);
   - rollup: number, date, or contains for a list.
-  
+
   Every extra field can also be filtered on "is empty" or "has a value". People and relations are filtered only on empty or not, because their names and titles aren't read. Filters on Duration leave out entries that have no valid range.
 - **Selecting and opening** (decided in Phase 7): a single click on a row only selects it, and the arrow keys move the selection. Each row ends with an "Open in Notion" icon button; double-clicking a row, or pressing Enter on the selected row, also opens it. Text in cells can be selected and copied. The parent task link and the "+N" list open their own pages.
 - **Sorting:** every column sorts, ascending or descending. Empty values always sort last, and ties keep the newest start first. The default is Start, newest first.
@@ -506,7 +506,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 4. Map | Build schema reading, auto-matching (including a single date-range column), the review screen with sample values, extra-field selection, missing-required-field errors, saving and reopening the mapping with the full-sync-required flag, and the reusable schema check (6.3). | The author's Work Log maps correctly with no manual changes and shows correct sample values; Work Log (test) maps correctly; a real Notion database with no end-time column shows the exact missing-field explanation; all CI checks pass. |
 | 5. Sync | Implement full sync, quick sync (cursor on Notion's clock; a full sync on launch when the last is over 24 hours old), the mass-removal safeguard, validation, progress events, retries, every parent-task link, and Home's "Last sync" panel with the flagged entries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, the overlap rule, the day detail panel, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
-| 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
+| 7. Raw logs | Build the table with filters (including issue types, overlaps and every extra field), red issue cells, hover explanations, overlap markers, select-then-open Notion links, remembered sort, widths and hidden columns, and CSV export through the native Save dialog. Write tests for the filters, sorting, export and the overlap agreement with the dashboard. | Every filter works, and flagged entries show the correct explanations. |
 | 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
 
 ### 15.1 Phase 0 checklist: project setup
