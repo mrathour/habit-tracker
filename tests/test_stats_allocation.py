@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+import random
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.stats.allocation import Session, allocate, counted_pieces, overlap_minutes
+from app.stats.allocation import Session, allocate, counted_pieces, overlap_minutes, overlaps
 from app.stats.preferences import MidnightRule, OverlapRule
 
 INDIA = ZoneInfo("Asia/Kolkata")
@@ -235,3 +236,39 @@ def test_overlap_minutes_for_the_day_detail(sessions: list[Session], expected: f
     overlapped, others = overlap_minutes(sessions[0], sessions)
     assert overlapped == expected
     assert [o.page_id for o in others] == [x.page_id for x in sessions[1:]]
+
+
+def test_overlaps_matches_overlap_minutes_against_every_session() -> None:
+    """The one-sweep version gives exactly what comparing each session with all others gives."""
+    rng = random.Random(7)  # noqa: S311 - a fixed seed for test data, not security
+    base = datetime(2026, 10, 1, tzinfo=UTC)
+    sessions = []
+    for index in range(300):
+        start = base + timedelta(minutes=rng.randrange(0, 20_000))
+        length = timedelta(minutes=rng.choice([0, 5, 30, 90, 600, 2000]))
+        sessions.append(Session(f"p{index:03}", start, start + length))
+    found = overlaps(sessions)
+    for session in sessions:
+        expected_minutes, expected_others = overlap_minutes(session, sessions)
+        if expected_minutes == 0:
+            assert session.page_id not in found
+            continue
+        got_minutes, got_others = found[session.page_id]
+        assert got_minutes == pytest.approx(expected_minutes)
+        assert [o.page_id for o in got_others] == [o.page_id for o in expected_others]
+    assert found  # the random set does overlap
+
+
+def test_overlaps_ignores_sessions_that_only_touch() -> None:
+    a = s("a", "2026-10-21 09:00", "2026-10-21 10:00")
+    b = s("b", "2026-10-21 10:00", "2026-10-21 11:00")
+    empty = s("c", "2026-10-21 09:30", "2026-10-21 09:30")
+    assert overlaps([a, b, empty]) == {}
+    c = s("d", "2026-10-21 09:45", "2026-10-21 10:15")
+    found = overlaps([a, b, c])
+    assert {key: round(value[0], 6) for key, value in found.items()} == {
+        "a": 15,
+        "b": 15,
+        "d": 30,
+    }
+    assert [o.page_id for o in found["d"][1]] == ["a", "b"]
