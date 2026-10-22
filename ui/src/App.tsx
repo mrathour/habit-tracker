@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { callPython, waitForBridge } from "./bridge/client";
-import type { ConnectionInfo } from "./bridge/types";
+import type { ConnectionInfo, RawLogFilters } from "./bridge/types";
 import { BrandMark } from "./components/BrandMark";
 import { ErrorBanners } from "./components/ErrorBanners";
 import { useAppInfo } from "./components/useAppInfo";
 import { WorkspaceBadge } from "./components/WorkspaceBadge";
 import { useConnection } from "./connection/useConnection";
+import { RawLogView } from "./rawlog/RawLogView";
 import { SyncIndicator } from "./sync/SyncIndicator";
 import { useSync } from "./sync/useSync";
 import { ConnectView } from "./views/ConnectView";
@@ -15,7 +16,7 @@ import { MappingView } from "./views/MappingView";
 import { PickerView } from "./views/PickerView";
 import { SettingsView } from "./views/SettingsView";
 
-type View = "home" | "settings";
+type View = "home" | "rawlog" | "settings";
 
 const DISCONNECTED: ConnectionInfo = {
   connected: false,
@@ -38,6 +39,8 @@ export function App() {
   const [mapping, setMapping] = useState(false);
   const [focusAdvanced, setFocusAdvanced] = useState(false);
   const [mappingSaved, setMappingSaved] = useState<{ fullSync: boolean } | null>(null);
+  // The raw log's filters last for the session, so switching tabs keeps them (PLAN.md 8).
+  const [rawLogFilters, setRawLogFilters] = useState<RawLogFilters>({});
 
   // Tell Python the page's event listeners are attached. Child effects run first, so every
   // hook above has subscribed by now and no pushed event is missed.
@@ -85,6 +88,12 @@ export function App() {
 
   const ready = info?.connected && !choosing && info.data_source_id;
 
+  /** Open the raw log with only the entries that have issues (the flagged count). */
+  const showFlagged = () => {
+    go("rawlog");
+    setRawLogFilters({ issues: "any" });
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -106,6 +115,18 @@ export function App() {
           >
             Home
           </button>
+          {canSync && (
+            <button
+              type="button"
+              className="nav-link"
+              aria-current={view === "rawlog" ? "page" : undefined}
+              onClick={() => {
+                go("rawlog");
+              }}
+            >
+              Raw log
+            </button>
+          )}
           <button
             type="button"
             className="nav-link"
@@ -119,7 +140,7 @@ export function App() {
         </nav>
       </header>
       <ErrorBanners />
-      <main className="page">
+      <main className="page" data-wide={view === "rawlog" ? "true" : undefined}>
         {connection.load.status === "loading" && (
           <p className="status" role="status">
             <span className="spinner" aria-hidden="true" /> Starting…
@@ -208,11 +229,36 @@ export function App() {
             onPasteNewToken={pasteNewToken}
           />
         )}
+        {info && view === "rawlog" && canSync && (
+          <RawLogView
+            filters={rawLogFilters}
+            onFiltersChange={setRawLogFilters}
+            sync={sync.load.status === "ready" ? sync.load.sync : null}
+          />
+        )}
+        {info && view === "rawlog" && !canSync && (
+          <div className="notice warn" role="status">
+            <strong>The raw log isn&apos;t available yet</strong>
+            <p>Connect to Notion, choose your work log and map its columns first.</p>
+            <div className="actions">
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  go("home");
+                }}
+              >
+                Go to Home
+              </button>
+            </div>
+          </div>
+        )}
         {info && view === "home" && ready && !mapping && info.mapping_saved && (
           <HomeView
             info={info}
             sync={sync}
             onPasteNewToken={pasteNewToken}
+            onShowFlagged={showFlagged}
             justSaved={mappingSaved}
             onChangeDatabase={chooseDatabase}
             onReviewMapping={() => {

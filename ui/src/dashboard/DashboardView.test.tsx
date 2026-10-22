@@ -118,8 +118,32 @@ describe("the figures", () => {
     ).toBeInTheDocument();
     expect(region.getByText("Entries with issues")).toBeInTheDocument();
     await screen.findByText("Entries with issues (5)");
-    await userEvent.click(first(region.getAllByRole("button", { name: "See them" })));
-    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("opens the raw log filtered to entries with issues", async () => {
+    const api = startWith(dashboard);
+    const region = await board();
+    await userEvent.click(
+      first(await region.findAllByRole("button", { name: "See them in the raw log" })),
+    );
+    expect(await screen.findByRole("heading", { name: "Raw log" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Raw log" })).toHaveAttribute("aria-current", "page");
+    await waitFor(() => {
+      expect(api.get_raw_log).toHaveBeenCalledWith(
+        expect.objectContaining({ filters: { issues: "any" } }),
+      );
+    });
+    expect(screen.getByRole("list", { name: "Active filters" })).toHaveTextContent("Has issues");
+  });
+
+  it("opens the raw log from Home's flagged list", async () => {
+    const api = startWith(dashboard);
+    await userEvent.click(await screen.findByRole("button", { name: "Open them in the raw log" }));
+    await waitFor(() => {
+      expect(api.get_raw_log).toHaveBeenCalledWith(
+        expect.objectContaining({ filters: { issues: "any" } }),
+      );
+    });
   });
 
   it("explains today's grace for the current streak", async () => {

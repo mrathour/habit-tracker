@@ -419,3 +419,10 @@ def test_a_damaged_view_part_falls_back_alone(db: Database, service: RawLogServi
 def test_malformed_view_changes_are_refused(service: RawLogService, changes: object) -> None:
     with pytest.raises(RawLogError):
         service.update_view(changes)
+
+
+def test_without_a_sort_the_remembered_one_is_used(service: RawLogService) -> None:
+    service.update_view({"sort": {"column": "task_name", "direction": "asc"}})
+    result = service.page({"time_zone": INDIA})
+    assert result["sort"] == {"column": "task_name", "direction": "asc"}
+    assert result["rows"][0]["page_id"] == "p6"

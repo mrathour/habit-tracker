@@ -1588,3 +1588,479 @@ a {
 .settings-grid .select {
   max-width: 220px;
 }
+
+/* --- Raw log (RawLogView, RawLogTable, FilterBar) ---------------------------------------- */
+
+.page[data-wide="true"] {
+  max-width: none;
+}
+
+.rawlog {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rawlog-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rawlog-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.rawlog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 420px;
+}
+
+.rawlog-actions .export-notice {
+  flex-basis: 100%;
+}
+
+.export-path code {
+  overflow-wrap: anywhere;
+}
+
+.filter-bar {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.filter-field {
+  display: grid;
+  gap: 4px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.filter-field.grow {
+  flex: 1 1 220px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0;
+}
+
+.filter-bar .input,
+.filter-panel .input {
+  font-family: var(--font-ui);
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.input-pair {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.input-pair .input {
+  width: auto;
+  min-width: 0;
+}
+
+.input-pair input[type="number"] {
+  width: 96px;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.filter-toggle input {
+  accent-color: var(--green);
+  margin: 0;
+}
+
+.filter-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px 20px;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.parent-filter {
+  grid-column: 1 / -1;
+}
+
+.parent-list,
+.option-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0 16px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.parent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.filter-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-chips > li:not(:last-child) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.chip-remove {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chip-remove:hover {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.rawlog-scroll {
+  position: relative;
+  overflow: auto;
+  height: calc(100vh - 300px);
+  min-height: 320px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.rawlog-table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  min-width: 100%;
+}
+
+.rawlog-table:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.rawlog-table th,
+.rawlog-table td {
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.rawlog-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--sunken);
+  padding: 0;
+}
+
+.rawlog-table td[data-kind="duration"],
+.rawlog-table td[data-kind="logged_minutes"],
+.rawlog-table td[data-kind="display_id"] {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.sort-button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sort-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sort-mark {
+  font-size: 9px;
+  color: var(--green);
+}
+
+th[aria-sort="ascending"] .sort-button,
+th[aria-sort="descending"] .sort-button {
+  color: var(--ink);
+}
+
+.col-resizer {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  right: 0;
+  width: 7px;
+  cursor: col-resize;
+  border-right: 2px solid var(--rule);
+  touch-action: none;
+}
+
+.col-resizer:hover,
+.col-resizer.resizing,
+.col-resizer:focus-visible {
+  border-right-color: var(--green);
+}
+
+.rawlog-table tbody tr:hover:not(.spacer, .placeholder) td {
+  background: color-mix(in srgb, var(--sunken) 60%, transparent);
+}
+
+.rawlog-table tbody tr.selected td {
+  background: var(--green-soft);
+}
+
+.rawlog-table tbody tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.rawlog-table td.cell-issue,
+.rawlog-table tbody tr.selected td.cell-issue,
+.rawlog-table tbody tr:hover td.cell-issue {
+  background: var(--red-soft);
+  color: var(--red);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 40%, transparent);
+}
+
+.rawlog-table tr.spacer td {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.rawlog-table tr.placeholder td {
+  color: var(--muted);
+}
+
+.skeleton-line {
+  display: block;
+  height: 10px;
+  width: 60%;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+
+.cell-text {
+  user-select: text;
+}
+
+.link-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.more-chip,
+.issue-chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--sunken);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.issue-chip {
+  border-color: color-mix(in srgb, var(--red) 40%, var(--rule));
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.overlap-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 12px;
+}
+
+.overlap-marker svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.open-cell {
+  text-align: center;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: var(--rule);
+  background: var(--surface);
+}
+
+.icon-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cell-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  white-space: pre-line;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+
+.popover {
+  position: fixed;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+}
+
+.popover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.popover-list > li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.popover-list.issue-list {
+  list-style: disc;
+  padding-left: 18px;
+}
+
+.popover-list.issue-list > li {
+  display: list-item;
+}
+
+.choices-plain {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.rawlog-skeleton {
+  display: grid;
+  gap: 6px;
+}
+
+.skeleton-row {
+  height: 36px;
+  border-radius: var(--radius-control);
+}
+
+.rawlog-help {
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .rawlog-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .rawlog-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}

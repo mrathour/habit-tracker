@@ -106,7 +106,10 @@ class RawLogService:
     # --- the table ---------------------------------------------------------------------------
 
     def page(self, request: object) -> RawLogPage:
-        """One page of rows: ``{time_zone, filters, sort, offset, limit}``."""
+        """One page of rows: ``{time_zone, filters, sort, offset, limit}``.
+
+        ``sort`` may be left out to use the remembered sort.
+        """
         if not isinstance(request, dict):
             raise RawLogError("The raw log request was sent in an unexpected form.")
         offset = _whole(request.get("offset", 0), "offset", 0, None)
@@ -174,7 +177,9 @@ class RawLogService:
 
     def _query(self, request: dict[str, Any]) -> tuple[Snapshot, list[LogRow], SortSpec]:
         zone = _zone(request.get("time_zone"))
-        sort = view.parse_sort(request.get("sort", view.DEFAULT_SORT))
+        # Without a sort, the remembered one (PLAN.md 8), so the first page needs no extra call.
+        stored = request.get("sort")
+        sort = view.read(self._settings)["sort"] if stored is None else view.parse_sort(stored)
         with self._lock:
             snap = self._current(zone)
             known = {column["key"] for column in snap.columns}

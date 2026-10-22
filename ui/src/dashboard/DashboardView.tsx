@@ -17,15 +17,18 @@ const WEEKDAY_INDEX: Record<string, number> = {
   saturday: 6,
 };
 
-function scrollToFlagged() {
-  document.getElementById("flagged-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 /**
  * Home's dashboard (PLAN.md 7): streaks, daily totals, weekly trend and the calendar. Every
  * chart has a table view, and clicking a day opens its sessions.
  */
-export function DashboardSection({ sync }: { sync: SyncStatus | null }) {
+export function DashboardSection({
+  sync,
+  onShowFlagged,
+}: {
+  sync: SyncStatus | null;
+  /** Opens the raw log filtered to entries with issues (PLAN.md 7, 8). */
+  onShowFlagged: () => void;
+}) {
   // A finished sync (or a new result) refreshes the figures.
   const refreshKey = `${sync?.last_result?.finished_at ?? ""}|${String(sync?.entries ?? 0)}`;
   const { view, setView, load, retry } = useDashboard(refreshKey);
@@ -84,7 +87,7 @@ export function DashboardSection({ sync }: { sync: SyncStatus | null }) {
             before they start. Fix them in Notion and they appear here after the next sync.
           </p>
           <div className="actions">
-            <button type="button" className="button" onClick={scrollToFlagged}>
+            <button type="button" className="button" onClick={onShowFlagged}>
               See the entries with issues
             </button>
           </div>
@@ -94,13 +97,13 @@ export function DashboardSection({ sync }: { sync: SyncStatus | null }) {
           <p className="small muted">
             {plural(data.excluded, "entry", "entries")} {data.excluded === 1 ? "is" : "are"} left
             out of the charts because of a missing time or an end before the start.{" "}
-            <button type="button" className="link-button" onClick={scrollToFlagged}>
+            <button type="button" className="link-button" onClick={onShowFlagged}>
               See {data.excluded === 1 ? "it" : "them"}
             </button>
           </p>
         )
       )}
-      <StatRow data={data} />
+      <StatRow data={data} onShowFlagged={onShowFlagged} />
       <DailyCard data={data} view={view} setView={setView} onDay={setDay} />
       <WeeklyCard weeks={data.weekly} view={view} setView={setView} />
       <CalendarCard data={data} view={view} setView={setView} onDay={setDay} />
@@ -116,7 +119,7 @@ export function DashboardSection({ sync }: { sync: SyncStatus | null }) {
   );
 }
 
-function StatRow({ data }: { data: Dashboard }) {
+function StatRow({ data, onShowFlagged }: { data: Dashboard; onShowFlagged: () => void }) {
   const { current, longest, today_counts, threshold_minutes } = data.streaks;
   const threshold =
     threshold_minutes > 0 ? `${formatDuration(threshold_minutes)} or more a day` : "any time a day";
@@ -151,8 +154,8 @@ function StatRow({ data }: { data: Dashboard }) {
         <span className="stat-label">Entries with issues</span>
         <span className="stat-value figure">{data.flagged.toLocaleString()}</span>
         {data.flagged > 0 ? (
-          <button type="button" className="link-button small" onClick={scrollToFlagged}>
-            See them
+          <button type="button" className="link-button small" onClick={onShowFlagged}>
+            See them in the raw log
           </button>
         ) : (
           <span className="small muted">All entries look right</span>

@@ -18,6 +18,7 @@ import type {
   SyncStatus,
 } from "../bridge/types";
 import fixtures from "./mappingFixtures.json";
+import { rawLogPage } from "./rawLogFixtures";
 
 /**
  * Mapping reviews made by the real Python service (tests/support/ui_fixtures.py): the Work
@@ -362,6 +363,14 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
     set_preferences: vi.fn<PythonApi["set_preferences"]>((changes) =>
       ok({ ...defaultPreferences, ...changes }),
     ),
+    get_raw_log: vi.fn<PythonApi["get_raw_log"]>(() => ok(rawLogPage)),
+    set_raw_log_view: vi.fn<PythonApi["set_raw_log_view"]>((changes) =>
+      ok({ ...rawLogPage.view, ...changes }),
+    ),
+    export_raw_log: vi.fn<PythonApi["export_raw_log"]>(() =>
+      ok({ status: "saved" as const, path: "C:\\Users\\me\\log.csv", rows: 5 }),
+    ),
+    show_exported_file: vi.fn(() => ok(null)),
     open_external: vi.fn(() => ok(null)),
   };
   // Overrides replace the default behaviour but stay spies, so tests can assert on calls

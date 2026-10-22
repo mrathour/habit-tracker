@@ -28,7 +28,8 @@ export type ErrorCode =
   | "not_ready"
   | "schema_blocked"
   | "invalid_request"
-  | "invalid_preference";
+  | "invalid_preference"
+  | "export_failed";
 
 export type AuthKind = "oauth" | "internal" | "pat";
 export type PastedKind = "internal" | "pat";
@@ -224,6 +225,134 @@ export interface FlaggedEntry {
 export interface FlaggedPage {
   entries: FlaggedEntry[];
   total: number;
+}
+
+// --- Raw log (app/rawlog/) ---------------------------------------------------------------
+
+export type IssueCode = Issue["code"];
+export type SortDirection = "asc" | "desc";
+
+export interface SortSpec {
+  column: string;
+  direction: SortDirection;
+}
+
+/** The raw log's remembered sort, column widths and hidden columns (`raw_log_view`). */
+export interface RawLogViewPrefs {
+  sort: SortSpec;
+  widths: Record<string, number>;
+  hidden: string[];
+}
+
+export type ExtraFilterKind = "text" | "number" | "checkbox" | "options" | "date" | "presence";
+
+export type ExtraFilter =
+  | { op: "empty" }
+  | { op: "not_empty" }
+  | { op: "contains"; value: string }
+  | { op: "range"; min?: number | null; max?: number | null }
+  | { op: "is"; value: boolean }
+  | { op: "any_of"; values: string[] }
+  | { op: "dates"; from?: string | null; to?: string | null };
+
+export interface RawLogFilters {
+  date_from?: string | null;
+  date_to?: string | null;
+  search?: string;
+  parents?: string[];
+  no_parent?: boolean;
+  duration_min?: number | null;
+  duration_max?: number | null;
+  issues?: "any" | "none" | null;
+  issue_codes?: IssueCode[];
+  overlaps?: boolean;
+  extra?: Record<string, ExtraFilter>;
+}
+
+export interface RawLogRequest {
+  time_zone: string;
+  filters: RawLogFilters;
+  /** Leave out to use the remembered sort. */
+  sort?: SortSpec;
+  offset: number;
+  limit: number;
+}
+
+export type RawLogColumnKind =
+  | "display_id"
+  | "task_name"
+  | "start"
+  | "end"
+  | "duration"
+  | "logged_minutes"
+  | "parent_task"
+  | "extra"
+  | "overlap"
+  | "issues";
+
+export interface RawLogColumn {
+  key: string;
+  label: string;
+  kind: RawLogColumnKind;
+  type: string | null;
+  type_label: string | null;
+  filter: ExtraFilterKind | null;
+  options: string[];
+}
+
+export interface MomentCell {
+  utc: string | null;
+  date: string;
+  has_time: boolean;
+}
+
+export interface ExtraCell {
+  text: string;
+  start?: MomentCell;
+  end?: MomentCell | null;
+  links?: string[];
+}
+
+export interface RawLogRow {
+  page_id: string;
+  url: string;
+  display_id: string | null;
+  task_name: string | null;
+  start_utc: string | null;
+  end_utc: string | null;
+  duration_minutes: number | null;
+  logged_minutes: number | null;
+  parent_task_ids: string[];
+  parent_urls: string[];
+  extras: Record<string, ExtraCell | null>;
+  issues: Issue[];
+  overlap_minutes: number;
+  overlaps_with: { page_id: string; label: string }[];
+}
+
+export interface ParentChoice {
+  page_id: string;
+  url: string;
+  entries: number;
+  latest_task_name: string | null;
+}
+
+export interface RawLogPage {
+  time_zone: string;
+  total_entries: number;
+  matched: number;
+  offset: number;
+  rows: RawLogRow[];
+  sort: SortSpec;
+  columns: RawLogColumn[];
+  parents: ParentChoice[];
+  view: RawLogViewPrefs;
+}
+
+export interface ExportResult {
+  status: "saved" | "cancelled" | "empty";
+  path: string | null;
+  rows: number;
 }
 
 // --- Dashboard (app/stats/) --------------------------------------------------------------
@@ -424,6 +553,13 @@ export interface PythonApi {
   get_day_detail(timeZone: string, day: string): Promise<BridgeResponse<DayDetail>>;
   get_preferences(): Promise<BridgeResponse<Preferences>>;
   set_preferences(changes: Partial<Preferences>): Promise<BridgeResponse<Preferences>>;
+  get_raw_log(request: RawLogRequest): Promise<BridgeResponse<RawLogPage>>;
+  set_raw_log_view(changes: Partial<RawLogViewPrefs>): Promise<BridgeResponse<RawLogViewPrefs>>;
+  export_raw_log(
+    request: Omit<RawLogRequest, "offset" | "limit">,
+    columns: string[],
+  ): Promise<BridgeResponse<ExportResult>>;
+  show_exported_file(): Promise<BridgeResponse<null>>;
   open_external(url: string): Promise<BridgeResponse<null>>;
 }
 
