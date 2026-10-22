@@ -46,6 +46,8 @@ from app.rawlog.service import RawLogService
 from app.single_instance import SingleInstance, bring_existing_window_to_front
 from app.stats.service import StatsService
 from app.sync.engine import SyncService
+from app.uninstall import cleanup_from_installer
+from app.webview2 import check_runtime, missing_runtime_help
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,9 @@ WINDOW_MIN_SIZE: Final = (960, 640)
 #: Dev mode has no watchdog: Vite's error overlay and the inspector show what went wrong, and
 #: replacing the page would stop hot reload from recovering once the code is fixed.
 UI_READY_TIMEOUT_S: Final = 15.0
+#: Always Edge WebView2: pywebview would otherwise fall back to Internet Explorer's engine,
+#: which can't run the interface (PLAN.md 13).
+WEB_ENGINE: Final = "edgechromium"
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -76,6 +81,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--self-check",
         action="store_true",
         help="start up without opening a window, print a JSON report, and exit",
+    )
+    parser.add_argument(
+        "--uninstall-cleanup",
+        action="store_true",
+        help="used by the uninstaller: disconnect from Notion and delete the local data",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
@@ -346,9 +356,9 @@ def run_window(
     logger.info("Opening the window (%s mode)", mode)
     try:
         if automation is None:
-            webview.start(debug=args.dev, private_mode=True)
+            webview.start(gui=WEB_ENGINE, debug=args.dev, private_mode=True)
         else:
-            webview.start(automation, (window,), debug=args.dev, private_mode=True)
+            webview.start(automation, (window,), gui=WEB_ENGINE, debug=args.dev, private_mode=True)
     finally:
         startup.close()
         logger.info("Window closed")
@@ -366,8 +376,59 @@ def show_fatal_message(message: str) -> None:
         sys.stderr.write(message + "\n")
 
 
+def ensure_stdio() -> None:
+    """Give the windowed (console-less) build somewhere to print ``--self-check`` and
+    ``--version``: the console it was started from, or nowhere."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    attached = False
+    if sys.platform == "win32":
+        import ctypes
+
+        attach_parent_process = -1
+        attached = bool(ctypes.windll.kernel32.AttachConsole(attach_parent_process))
+    target = "CONOUT$" if attached else os.devnull
+    if sys.stdout is None:
+        sys.stdout = Path(target).open("w", encoding="utf-8")  # noqa: SIM115 - kept open
+    if sys.stderr is None:
+        sys.stderr = Path(target).open("w", encoding="utf-8")  # noqa: SIM115
+
+
+def check_webview_runtime() -> bool:
+    """Explain instead of opening a broken window when WebView2 is missing (PLAN.md 13)."""
+    runtime = check_runtime()
+    if runtime.ok:
+        logger.info("WebView2 Runtime %s", runtime.webview2_version)
+        return True
+    logger.error(
+        "Can't open the window: WebView2 %s, .NET Framework 4.6.2+ %s",
+        runtime.webview2_version or "missing",
+        "found" if runtime.dotnet_ok else "missing",
+    )
+    message, url = missing_runtime_help(runtime, APP_NAME)
+    if ask_yes_no(message):
+        import webbrowser
+
+        webbrowser.open(url)
+    return False
+
+
+def ask_yes_no(message: str) -> bool:
+    if sys.platform != "win32":  # pragma: no cover - the app targets Windows
+        sys.stderr.write(message + "\n")
+        return False
+    import ctypes
+
+    mb_yesno, mb_iconwarning, idyes = 0x4, 0x30, 6
+    answer = ctypes.windll.user32.MessageBoxW(None, message, APP_NAME, mb_yesno | mb_iconwarning)
+    return bool(answer == idyes)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    ensure_stdio()
     args = parse_args(argv)
+    if args.uninstall_cleanup:
+        return cleanup_from_installer()
     paths = AppPaths.resolve()
     try:
         paths.ensure()
@@ -396,6 +457,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not bring_existing_window_to_front(APP_NAME):
                 show_fatal_message(f"{APP_NAME} is already running.")
             return 0
+        if not check_webview_runtime():
+            return 1
         try:
             return run_window(args, paths)
         except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing

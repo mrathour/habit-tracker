@@ -121,6 +121,7 @@ def test_window_failure_shows_a_message(monkeypatch: pytest.MonkeyPatch, built_u
 
     shown: list[str] = []
     monkeypatch.setattr(main, "run_window", broken)
+    monkeypatch.setattr(main, "check_webview_runtime", lambda: True)
     monkeypatch.setattr(main, "show_fatal_message", shown.append)
     assert main.main([]) == 1
     assert "couldn't open its window" in shown[0]
