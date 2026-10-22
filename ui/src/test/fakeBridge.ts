@@ -13,6 +13,7 @@ import type {
   ErrorCode,
   FlaggedPage,
   MappingReview,
+  PolicyNotice,
   PythonApi,
   SyncResult,
   SyncStatus,
@@ -44,6 +45,7 @@ export const appInfo: AppInfo = {
   database_path: "C:\\Users\\me\\AppData\\Roaming\\HabitTracker\\habit_tracker.db",
   log_dir: "C:\\Users\\me\\AppData\\Roaming\\HabitTracker\\logs",
   schema_version: 1,
+  policy_version: 1,
   started_at: "2026-10-18T05:00:00Z",
 };
 
@@ -81,6 +83,21 @@ export const connectedUnmapped: ConnectionInfo = {
   ...connectedWithDatabase,
   database_title: "Work Log",
   mapping_saved: false,
+};
+
+/** A build with policy version 3 opened by a copy that acknowledged version 1. */
+export const policyNotice: PolicyNotice = {
+  version: 3,
+  acknowledged_version: 1,
+  url: "https://habit-tracker.mrathour.workers.dev/privacy",
+  changes: [
+    { version: 2, date: "2026-11-01", summary: ["Logs are kept for 30 days instead of 60."] },
+    {
+      version: 3,
+      date: "2026-12-01",
+      summary: ["The app checks GitHub for new versions.", "You can turn this off in Settings."],
+    },
+  ],
 };
 
 export const twoDatabases: DataSourcePage = {
@@ -346,6 +363,8 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
     open_log_folder: vi.fn(() => ok(null)),
     raise_test_error: vi.fn(() => ok(null)),
     quit: vi.fn(() => ok(null)),
+    get_policy_notice: vi.fn<PythonApi["get_policy_notice"]>(() => ok(null)),
+    acknowledge_policy: vi.fn<PythonApi["acknowledge_policy"]>(() => ok(null)),
     get_connection: vi.fn(() => ok(disconnected)),
     connect_with_token: vi.fn(() => ok(connectedNoDatabase)),
     start_sign_in: vi.fn(() => ok({ port: 50000, reopened: false })),

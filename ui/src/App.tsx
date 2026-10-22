@@ -7,6 +7,8 @@ import { ErrorBanners } from "./components/ErrorBanners";
 import { useAppInfo } from "./components/useAppInfo";
 import { WorkspaceBadge } from "./components/WorkspaceBadge";
 import { useConnection } from "./connection/useConnection";
+import { PolicyGate } from "./policy/PolicyGate";
+import { usePolicyNotice } from "./policy/usePolicyNotice";
 import { RawLogView } from "./rawlog/RawLogView";
 import { SyncIndicator } from "./sync/SyncIndicator";
 import { useSync } from "./sync/useSync";
@@ -33,6 +35,7 @@ const DISCONNECTED: ConnectionInfo = {
 
 export function App() {
   const appInfo = useAppInfo();
+  const policy = usePolicyNotice();
   const connection = useConnection();
   const [view, setView] = useState<View>("home");
   const [choosing, setChoosing] = useState(false);
@@ -51,7 +54,11 @@ export function App() {
   }, []);
 
   const details = appInfo.status === "ready" ? appInfo.info : null;
-  const info = connection.load.status === "ready" ? connection.load.info : null;
+  // A privacy policy notice comes before everything else, including the launch sync
+  // (PLAN.md 13). Until it is cleared, no screen that could reach Notion is shown.
+  const policyLoad = policy.load;
+  const cleared = policyLoad.status === "clear";
+  const info = cleared && connection.load.status === "ready" ? connection.load.info : null;
 
   // Syncing needs a connection, a chosen work log and a saved mapping. Each launch runs one
   // sync ("auto": quick, or full when it's due), once those are in place (PLAN.md 6.1).
@@ -104,7 +111,7 @@ export function App() {
         {info?.connected && <WorkspaceBadge info={info} small />}
         {canSync && sync.load.status === "ready" && <SyncIndicator sync={sync.load.sync} />}
         {details?.mode === "dev" && <span className="dev-flag">Dev mode</span>}
-        <nav aria-label="Main">
+        <nav aria-label="Main" hidden={!cleared}>
           <button
             type="button"
             className="nav-link"
@@ -140,13 +147,20 @@ export function App() {
         </nav>
       </header>
       <ErrorBanners />
-      <main className="page" data-wide={view === "rawlog" ? "true" : undefined}>
-        {connection.load.status === "loading" && (
+      <main className="page" data-wide={view === "rawlog" && cleared ? "true" : undefined}>
+        {policyLoad.status !== "clear" && (
+          <PolicyGate
+            load={policyLoad}
+            onAcknowledge={policy.acknowledge}
+            onRetry={policy.reload}
+          />
+        )}
+        {cleared && connection.load.status === "loading" && (
           <p className="status" role="status">
             <span className="spinner" aria-hidden="true" /> Starting…
           </p>
         )}
-        {connection.load.status === "unavailable" && (
+        {cleared && connection.load.status === "unavailable" && (
           <div className="notice warn" role="alert">
             <strong>Open this inside Habit Tracker</strong>
             <p>
@@ -155,7 +169,7 @@ export function App() {
             </p>
           </div>
         )}
-        {connection.load.status === "error" && (
+        {cleared && connection.load.status === "error" && (
           <div className="notice error" role="alert">
             <strong>The Notion connection couldn&apos;t be read</strong>
             <p>{connection.load.message}</p>

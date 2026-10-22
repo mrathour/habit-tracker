@@ -2057,3 +2057,30 @@ th[aria-sort="descending"] .sort-button {
 .rawlog-help {
   margin-top: 8px;
 }
+
+/* Privacy policy change notice (PLAN.md 13) */
+.policy-notice {
+  max-width: 46rem;
+}
+.policy-changes {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.policy-change {
+  border-left: 3px solid var(--green);
+  padding: 0.25rem 0 0.25rem 1rem;
+}
+.policy-change h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+.policy-change ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.legal-links {
+  margin-top: 0.5rem;
+}
