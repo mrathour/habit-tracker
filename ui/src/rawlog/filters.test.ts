@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { rawLogColumns, rawLogPage } from "../test/rawLogFixtures";
 import { activeChips, hasFilters, parentLabel, removeChip, requestFilters } from "./filters";
-import { extraText, formatMinutes } from "./format";
+import { extraText, formatCalendarDate, formatMinutes } from "./format";
 
 describe("requestFilters", () => {
   it("drops empty parts", () => {
@@ -82,7 +82,7 @@ describe("chips", () => {
   it("describe every active filter", () => {
     expect(activeChips(filters, rawLogColumns, rawLogPage.parents).map((c) => c.label)).toEqual([
       "Task name contains “docs”",
-      "Started from 1 Oct 2026",
+      `Started from ${formatCalendarDate("2026-10-01")}`,
       "Parent task: Page t1",
       "Duration up to 90 min",
       "Has issues",
