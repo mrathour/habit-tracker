@@ -568,3 +568,36 @@ def test_a_rejected_replacement_keeps_the_current_connection(harness: Harness) -
         harness.service.connect_with_token("pat", "ntn_rejected_0123456789")
     assert harness.token_service.revoked == []
     assert harness.tokens.access_token().reveal() == old
+
+
+# --- Privacy policy (PLAN.md 13) -------------------------------------------------------------
+
+
+def test_connecting_records_the_policy_version(harness: Harness) -> None:
+    """Connecting is where the policy is linked, so both ways of connecting record it."""
+    calls: list[str] = []
+    harness.service._on_connected = lambda: calls.append("connected")
+    harness.service.connect_with_token("internal", harness.notion.issue_token())
+    assert calls == ["connected"]
+
+    harness.service.start_sign_in()
+    harness.deliver_result(ok_body(harness.notion.issue_token()))
+    assert harness.wait_done()["result"] == "connected"
+    assert calls == ["connected", "connected"]
+
+
+def test_failed_connections_record_nothing(harness: Harness) -> None:
+    calls: list[str] = []
+    harness.service._on_connected = lambda: calls.append("connected")
+    with pytest.raises(InvalidTokenError):
+        harness.service.connect_with_token("internal", "ntn_" + "x" * 40)
+    assert calls == []
+
+
+def test_a_failure_to_record_the_policy_never_undoes_the_connection(harness: Harness) -> None:
+    def fail() -> None:
+        raise RuntimeError("disk full")
+
+    harness.service._on_connected = fail
+    info = harness.service.connect_with_token("internal", harness.notion.issue_token())
+    assert info["connected"] is True

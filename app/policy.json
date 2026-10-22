@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "url": "https://habit-tracker.mrathour.workers.dev/privacy",
+  "changes": [
+    {
+      "version": 1,
+      "date": "2026-10-18",
+      "summary": ["The first version of the privacy policy."]
+    }
+  ]
+}

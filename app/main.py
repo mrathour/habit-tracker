@@ -27,6 +27,7 @@ from typing import Any, Final
 from app import APP_NAME, __version__
 from app.api import Api, AppContext, Mode
 from app.db import Database, open_database
+from app.db.connection import lock_for
 from app.db.settings import Settings
 from app.devserver import DEFAULT_DEV_URL, ViteDevServer, ensure_dev_server
 from app.error_page import render_error_page
@@ -40,6 +41,7 @@ from app.notion.credentials import CredentialStore
 from app.notion.service_client import DEFAULT_SERVICE_URL, SERVICE_URL_ENV_VAR, TokenServiceClient
 from app.notion.tokens import TokenManager
 from app.paths import AppPaths, resource_root, ui_dist_dir
+from app.policy import PolicyService
 from app.rawlog.service import RawLogService
 from app.single_instance import SingleInstance, bring_existing_window_to_front
 from app.stats.service import StatsService
@@ -183,12 +185,20 @@ class UiReadyWatchdog:
                 self._armed = False
 
 
-def build_services(
-    paths: AppPaths, database: Database, events: EventChannel
-) -> tuple[ConnectionService, MappingService, SyncService, StatsService, RawLogService]:
+@dataclass(slots=True)
+class Services:
+    connection: ConnectionService
+    mapping: MappingService
+    sync: SyncService
+    stats: StatsService
+    rawlog: RawLogService
+    policy: PolicyService
+
+
+def build_services(paths: AppPaths, database: Database, events: EventChannel) -> Services:
     """Wire the Notion connection (Credential Manager, token service, reader and settings), the
-    column mapping, the sync engine, the dashboard and the raw log, which share its reader and
-    settings."""
+    column mapping, the sync engine, the dashboard, the raw log and the privacy-policy notice,
+    which share its reader and settings."""
     service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
     notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
     tokens = TokenManager(CredentialStore.for_paths(paths), service)
@@ -198,6 +208,18 @@ def build_services(
         return NotionReader(manager, base_url=notion_url)
 
     reader = make_reader(tokens)
+
+    def has_connected() -> bool:
+        """This copy has been connected before (its policy baseline is the first version)."""
+        if tokens.credential() is not None:
+            return True
+        if any(settings.get(key) is not None for key in ("auth_kind", "database_id")):
+            return True
+        with lock_for(database.connection):
+            row = database.connection.execute("SELECT 1 FROM work_logs LIMIT 1").fetchone()
+        return row is not None
+
+    policy = PolicyService(settings=settings, has_connected=has_connected)
     connection = ConnectionService(
         tokens=tokens,
         reader=reader,
@@ -206,6 +228,7 @@ def build_services(
         db=database.connection,
         emit=events.emit,
         make_reader=make_reader,
+        on_connected=policy.record_connected,
     )
     mapping = MappingService(tokens=tokens, reader=reader, settings=settings)
     sync = SyncService(
@@ -218,7 +241,7 @@ def build_services(
     )
     stats = StatsService(db=database.connection, settings=settings)
     rawlog = RawLogService(db=database.connection, settings=settings)
-    return connection, mapping, sync, stats, rawlog
+    return Services(connection, mapping, sync, stats, rawlog, policy)
 
 
 def save_dialog(window: Any) -> Callable[[str], str | None]:  # noqa: ANN401 - a pywebview Window
@@ -256,22 +279,19 @@ def run_window(
     mode: Mode = "dev" if args.dev else "normal"
     events = EventChannel()
     startup = prepare(args, paths)
-    connection, mapping, sync, stats, rawlog = (
-        build_services(paths, startup.database, events)
-        if startup.database
-        else (None, None, None, None, None)
-    )
+    services = build_services(paths, startup.database, events) if startup.database else None
     context = AppContext(
         mode=mode,
         paths=paths,
         database=startup.database,
         events=events,
         diagnostics=args.dev or args.diagnostics,
-        connection=connection,
-        mapping=mapping,
-        sync=sync,
-        stats=stats,
-        rawlog=rawlog,
+        connection=services.connection if services else None,
+        mapping=services.mapping if services else None,
+        sync=services.sync if services else None,
+        stats=services.stats if services else None,
+        rawlog=services.rawlog if services else None,
+        policy=services.policy if services else None,
     )
     install_excepthooks(lambda report: events.emit("app:error", report.to_dict()))
 

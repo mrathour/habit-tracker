@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from app.mapping.review import MappingReview, MappingService, SaveResult
     from app.mapping.suggest import SuggestionDict
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
+    from app.policy import PolicyNotice, PolicyService
     from app.rawlog.service import ExportResult, RawLogPage, RawLogService
     from app.rawlog.view import ViewPrefs
     from app.stats.preferences import Preferences
@@ -64,6 +65,8 @@ class AppInfo(TypedDict):
     database_path: str
     log_dir: str
     schema_version: int
+    #: The privacy policy version this build was made for (PLAN.md 13).
+    policy_version: int | None
     started_at: str
 
 
@@ -96,6 +99,7 @@ class AppContext:
     #: The native Save dialog: a suggested file name in, the chosen path (or None) out.
     choose_save_path: Callable[[str], str | None] | None = None
     reveal_file: Callable[[Path], None] = field(default=lambda path: _reveal_in_explorer(path))
+    policy: PolicyService | None = None
 
 
 class Api:
@@ -119,6 +123,7 @@ class Api:
             "database_path": str(ctx.paths.database),
             "log_dir": str(ctx.paths.logs_dir),
             "schema_version": ctx.database.schema_version if ctx.database else 0,
+            "policy_version": ctx.policy.bundled_version if ctx.policy else None,
             "started_at": ctx.started_at.isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
 
@@ -202,6 +207,28 @@ class Api:
         if self._ctx.window is not None:
             self._ctx.window.destroy()
 
+    # --- Privacy-policy notice (PLAN.md 13) ----------------------------------------------
+
+    def _policy(self) -> PolicyService:
+        if self._ctx.policy is None:
+            raise AppError("The privacy notice isn't available because the app didn't start.")
+        return self._ctx.policy
+
+    def _policy_cleared(self) -> None:
+        """Nothing that reaches Notion or the token service runs while a notice is waiting."""
+        if self._ctx.policy is not None:
+            self._ctx.policy.require_acknowledged()
+
+    @bridge_method
+    def get_policy_notice(self) -> PolicyNotice | None:
+        """The privacy policy changes to show before anything else, or None. Read from this
+        build only; the website is never checked."""
+        return self._policy().notice()
+
+    @bridge_method
+    def acknowledge_policy(self, version: object) -> None:
+        self._policy().acknowledge(version)
+
     # --- Notion connection (PLAN.md 12) -------------------------------------------------
 
     def _connection(self) -> ConnectionService:
@@ -216,11 +243,13 @@ class Api:
     @bridge_method
     def connect_with_token(self, kind: object, token: object) -> ConnectionInfo:
         """Validate a pasted token with Notion, then store it. Nothing is stored on failure."""
+        self._policy_cleared()
         return self._connection().connect_with_token(kind, token)
 
     @bridge_method
     def start_sign_in(self) -> dict[str, object]:
         """Open Notion's consent page; the outcome arrives as connect:* events."""
+        self._policy_cleared()
         return self._connection().start_sign_in()
 
     @bridge_method
@@ -277,6 +306,7 @@ class Api:
     def start_sync(self, kind: object = "auto") -> SyncStatus:
         """Start a sync in the background ("auto", "quick" or "full"); progress arrives as
         sync:status events."""
+        self._policy_cleared()
         return self._sync().start(kind)
 
     @bridge_method
