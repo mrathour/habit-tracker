@@ -1312,3 +1312,279 @@ a {
   font-size: 13px;
   color: var(--red);
 }
+
+/* --- Dashboard (DashboardView, DayDetailDialog, DashboardSettings) ------------------------ */
+
+.column[data-width="dashboard"] {
+  max-width: 980px;
+}
+
+.dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-empty h2 {
+  font-size: 18px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  min-height: 96px;
+}
+
+.stat.skeleton {
+  border: 0;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.stat .link-button {
+  justify-self: start;
+}
+
+.chart-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.chart-card.skeleton.tall {
+  height: 320px;
+  border: 0;
+}
+
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-head h2 {
+  font-size: 17px;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chart-summary {
+  margin: 0;
+}
+
+.chart-body {
+  position: relative;
+}
+
+.echart {
+  width: 100%;
+}
+
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 0;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--rule);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.custom-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.custom-range .input {
+  width: auto;
+  padding: 4px 8px;
+  font-family: var(--font-ui);
+}
+
+.inline-select .input {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.table-wrap {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.data-table th[scope="row"] {
+  font-weight: 400;
+}
+
+.day-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.day-total {
+  margin: 0;
+}
+
+.day-total .figure {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.detail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.detail-session {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--green);
+  border-radius: var(--radius-control);
+}
+
+.detail-session.overlaps {
+  border-left-color: var(--amber);
+}
+
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-name {
+  font-weight: 600;
+}
+
+.detail-head .link-button {
+  margin-left: auto;
+}
+
+.detail-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.detail-facts dt {
+  color: var(--muted);
+}
+
+.detail-facts dd {
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-grid .input-row .input {
+  max-width: 140px;
+  font-family: var(--font-ui);
+}
+
+.settings-grid .select {
+  max-width: 220px;
+}

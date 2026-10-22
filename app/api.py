@@ -31,6 +31,8 @@ from app.paths import AppPaths
 if TYPE_CHECKING:
     from app.mapping.review import MappingReview, MappingService, SaveResult
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
+    from app.stats.preferences import Preferences
+    from app.stats.service import Dashboard, DayDetail, StatsService
     from app.sync.engine import FlaggedPage, SyncService, SyncStatus
 
 logger = logging.getLogger(__name__)
@@ -85,6 +87,7 @@ class AppContext:
     connection: ConnectionService | None = None
     mapping: MappingService | None = None
     sync: SyncService | None = None
+    stats: StatsService | None = None
     open_url: Callable[[str], object] = field(default=lambda url: _open_in_browser(url))
 
 
@@ -272,6 +275,30 @@ class Api:
     def resolve_pending_removal(self, remove: object) -> SyncStatus:
         """Answer the mass-removal question: remove the entries, or keep them."""
         return self._sync().resolve_pending_removal(remove)
+
+    # --- Dashboard (PLAN.md 7) ---------------------------------------------------------------
+
+    def _stats(self) -> StatsService:
+        if self._ctx.stats is None:
+            raise AppError("The dashboard isn't available because the app didn't start.")
+        return self._ctx.stats
+
+    @bridge_method
+    def get_dashboard(self, request: object) -> Dashboard:
+        """Every chart's figures: {time_zone, range: {days} or {from, to}, weeks, year}."""
+        return self._stats().dashboard(request)
+
+    @bridge_method
+    def get_day_detail(self, time_zone: object, day: object) -> DayDetail:
+        return self._stats().day_detail(time_zone, day)
+
+    @bridge_method
+    def get_preferences(self) -> Preferences:
+        return self._stats().preferences()
+
+    @bridge_method
+    def set_preferences(self, changes: object) -> Preferences:
+        return self._stats().update_preferences(changes)
 
     @bridge_method
     def open_external(self, url: object) -> None:

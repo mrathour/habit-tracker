@@ -43,6 +43,8 @@ import traceback
 import webbrowser
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import date, datetime, timedelta
+from datetime import time as clock
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +61,8 @@ from tests.support.memory_keyring import MemoryKeyring
 from tests.support.notion_schemas import (
     add_source,
     broken_rows,
+    page,
+    rich,
     when,
     without,
     work_log_rows,
@@ -343,8 +347,14 @@ def mapping(fake: FakeNotionServer) -> Scenario:
         wait_for(window, MAPPING_LOADED)
         select_option(window, "#field-display_id", "Not used")
         click(window, "Save mapping")
-        wait_for(window, "document.querySelector('[aria-label=\"Full sync required\"]') !== null")
-        results["changed_home"] = text(window, "[aria-label='Full sync required']")
+        # Saving the change starts the full sync it needs; the flag clears when it finishes.
+        wait_for(
+            window,
+            "(() => { const el = document.querySelector('.sync-done');"
+            " return el !== null && el.innerText.includes('The column mapping changed.'); })()",
+            timeout=60,
+        )
+        results["changed_home"] = text(window, "[aria-labelledby='sync-title']")
         snap("mapping-full-sync")
         click(window, "Settings")
         wait_for(window, heading_is("Settings"))
@@ -437,6 +447,90 @@ def sync_relaunch(fake: FakeNotionServer, home: Path) -> Scenario:
         wait_for_sync(window, "Full sync")
         results["full"] = panel_text(window)
         snap("sync-full")
+
+    return scenario
+
+
+def local_iso(day: date, hour: int, minute: int = 0) -> str:
+    """A wall-clock time on this computer, as Notion writes it (with the local offset)."""
+    moment = datetime.combine(day, clock(hour, minute)).astimezone()
+    return moment.isoformat(timespec="milliseconds")
+
+
+def dashboard_rows() -> list[dict[str, Any]]:
+    """Sessions in the last three days, in this computer's time zone. Worked out by hand:
+
+    * 3 days ago: C 23:00 to 00:30 crosses midnight: 60 min here, 30 min the next day.
+    * 2 days ago: A 09:00-10:30 (90) and B 10:00-11:00 (60) overlap by 30 min, counted
+      once: 120; plus C's 30: 150 min (2 h 30 min) from 3 sessions.
+    * Yesterday: D 14:00-14:45: 45 min.
+    * Total 255 min (4 h 15 min); current streak 3 days, through yesterday.
+    """
+    today = datetime.now().astimezone().date()  # this computer's local date
+    d1, d2, d3 = (today - timedelta(days=n) for n in (1, 2, 3))
+    source = work_log_schema()
+
+    def row(page_id: str, name: str, start: str, end: str) -> dict[str, Any]:
+        return page(
+            source,
+            {"Name": rich(name), "Start Time": when(start), "End Time": when(end)},
+            created="2026-01-01T00:00:00.000Z",
+            page_id=page_id,
+        )
+
+    return [
+        row("dash-a", "Write", local_iso(d2, 9), local_iso(d2, 10, 30)),
+        row("dash-b", "Review", local_iso(d2, 10), local_iso(d2, 11)),
+        row("dash-c", "Late night", local_iso(d3, 23), local_iso(d2, 0, 30)),
+        row("dash-d", "Plan", local_iso(d1, 14), local_iso(d1, 14, 45)),
+    ]
+
+
+def click_in(window: Any, container: str, label: str) -> None:
+    click(window, label, within=f"document.querySelector({json.dumps(container)})")
+
+
+def dashboard(fake: FakeNotionServer) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        paste_token(window, fake.notion.issue_token())
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log (test)")
+        click(window, "Use this database")
+        wait_for(window, MAPPING_LOADED)
+        click(window, "Save mapping")
+        wait_for(window, heading_is("Work Log (test)"))
+        wait_for_sync(window, "Full sync")
+        wait_for(window, "document.querySelector('.stat-row .stat:not(.skeleton)') !== null")
+        wait_for(window, "document.querySelectorAll('.echart canvas').length >= 3")
+        results["canvases"] = window.evaluate_js(
+            "document.querySelectorAll('.echart canvas').length"
+        )
+        results["banners"] = window.evaluate_js("document.querySelectorAll('.banner').length")
+        results["stats"] = window.evaluate_js(
+            "[...document.querySelectorAll('.stat')].map((el) => el.innerText)"
+        )
+        snap("dashboard")
+        daily = "[aria-labelledby='daily-title']"
+        click_in(window, daily, "Show as table")
+        wait_for(window, f'document.querySelector("{daily} table") !== null')
+        results["daily_rows"] = window.evaluate_js(
+            f'[...document.querySelectorAll("{daily} tbody tr")]'
+            ".map((tr) => tr.innerText).filter((t) => !t.includes('\\t0 min\\t'))"
+        )
+        # The day with the overlap and the midnight split.
+        two_days_ago = datetime.now().astimezone().date() - timedelta(days=2)
+        label = window.evaluate_js(
+            f'[...document.querySelectorAll("{daily} tbody th button")]'
+            f".map((b) => b.textContent)[2]"
+        )
+        results["detail_label"] = label
+        window.evaluate_js(f'document.querySelectorAll("{daily} tbody th button")[2].click()')
+        wait_for(window, "document.querySelector('.day-detail') !== null")
+        results["detail"] = text(window, "[role=dialog]")
+        results["detail_day"] = two_days_ago.isoformat()
+        snap("dashboard-day")
 
     return scenario
 
@@ -624,6 +718,12 @@ def main() -> int:
                 scenario = sync_relaunch(fake, home)
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(scenario)
+    elif name == "dashboard":
+        with FakeNotionServer() as fake:
+            fake.notion.workspace_name = "E2E Workspace"
+            add_source(fake.notion, "Work Log (test)", work_log_schema(), dashboard_rows())
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            exit_code = open_window(dashboard(fake))
     elif name == "mapping":
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)

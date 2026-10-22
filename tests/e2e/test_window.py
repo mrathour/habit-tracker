@@ -198,9 +198,12 @@ def test_column_mapping(tmp_path: Path) -> None:
     assert "2026" in results["samples"]["start"]
     assert "Column mapping saved." in results["saved_home"]
     # Changing the saved mapping records that a full sync is required.
-    assert "Mapping saved: a full sync is needed" in results["changed_home"]
-    assert "Full sync required" in results["settings"]
+    # Saving the change starts the full sync it needs, which clears the flag when it finishes.
+    assert "Full sync" in results["changed_home"]
+    assert "The column mapping changed." in results["changed_home"]
+    assert "Full sync required" not in results["settings"]
     assert "Saved the column mapping (changed; full sync required)" in log
+    assert "Full sync started (The column mapping changed.)" in log
     assert "ntn_" not in log
 
 
@@ -244,4 +247,32 @@ def test_sync_across_launches(tmp_path: Path) -> None:
     assert len(ids) == 9
     assert "p-ok" not in ids
     assert names["p-mismatch"] == "Mismatch, renamed"
+    assert "ntn_" not in log
+
+
+@pytest.mark.skipif(not (ui_dist_dir() / "index.html").is_file(), reason="UI not built")
+def test_dashboard_totals_match_hand_calculation(tmp_path: Path) -> None:
+    results, log = run_harness(tmp_path, "dashboard")
+    assert results["canvases"] >= 3  # the real charts drew under the strict CSP
+    assert results["banners"] == 0
+    stats = "\n".join(results["stats"]).lower()  # the labels are uppercased by CSS
+    assert "current streak\n3 days" in stats
+    assert "through yesterday" in stats
+    assert "longest streak\n3 days" in stats
+    assert "in this range\n4 h 15 min" in stats
+    assert "3 active days of 30" in stats
+    rows = results["daily_rows"]
+    # Newest first: yesterday, two days ago, three days ago.
+    assert [row.split("\t")[1:] for row in rows[:3]] == [
+        ["45 min", "1"],
+        ["2 h 30 min", "3"],
+        ["1 h", "1"],
+    ]
+    detail = results["detail"]
+    assert "2 h 30 min" in detail
+    assert "counted from 3 sessions" in detail
+    assert "Overlaps Review by 30 min." in detail
+    assert "Overlaps Write by 30 min." in detail
+    assert "Crosses midnight: split between the days it covers." in detail
+    assert "Overlapping time is counted once" in detail
     assert "ntn_" not in log

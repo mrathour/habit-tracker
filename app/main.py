@@ -41,6 +41,7 @@ from app.notion.service_client import DEFAULT_SERVICE_URL, SERVICE_URL_ENV_VAR, 
 from app.notion.tokens import TokenManager
 from app.paths import AppPaths, resource_root, ui_dist_dir
 from app.single_instance import SingleInstance, bring_existing_window_to_front
+from app.stats.service import StatsService
 from app.sync.engine import SyncService
 
 logger = logging.getLogger(__name__)
@@ -183,9 +184,9 @@ class UiReadyWatchdog:
 
 def build_services(
     paths: AppPaths, database: Database, events: EventChannel
-) -> tuple[ConnectionService, MappingService, SyncService]:
+) -> tuple[ConnectionService, MappingService, SyncService, StatsService]:
     """Wire the Notion connection (Credential Manager, token service, reader and settings), the
-    column mapping and the sync engine, which share its reader and settings."""
+    column mapping, the sync engine and the dashboard, which share its reader and settings."""
     service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
     notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
     tokens = TokenManager(CredentialStore(paths.credential_account), service)
@@ -213,7 +214,8 @@ def build_services(
         database_path=database.path,
         emit=events.emit,
     )
-    return connection, mapping, sync
+    stats = StatsService(db=database.connection, settings=settings)
+    return connection, mapping, sync, stats
 
 
 def run_window(
@@ -233,8 +235,10 @@ def run_window(
     mode: Mode = "dev" if args.dev else "normal"
     events = EventChannel()
     startup = prepare(args, paths)
-    connection, mapping, sync = (
-        build_services(paths, startup.database, events) if startup.database else (None, None, None)
+    connection, mapping, sync, stats = (
+        build_services(paths, startup.database, events)
+        if startup.database
+        else (None, None, None, None)
     )
     context = AppContext(
         mode=mode,
@@ -245,6 +249,7 @@ def run_window(
         connection=connection,
         mapping=mapping,
         sync=sync,
+        stats=stats,
     )
     install_excepthooks(lambda report: events.emit("app:error", report.to_dict()))
 
