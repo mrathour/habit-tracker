@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 
 import pytest
@@ -147,9 +148,14 @@ def test_declining_the_download_opens_nothing(monkeypatch: pytest.MonkeyPatch) -
     assert opened == []
 
 
-def test_self_check_does_not_need_the_window(
+def test_self_check_reports_webview2_without_needing_it(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(main, "check_runtime", lambda: pytest.fail("checked WebView2"))
+    """--self-check opens no window, so a missing runtime is reported, not a failure."""
+
+    monkeypatch.setattr(main, "check_runtime", lambda: RuntimeCheck(None, dotnet_ok=True))
+    monkeypatch.setattr(main, "ask_yes_no", lambda _message: pytest.fail("asked"))
     main.main(["--self-check"])
-    assert '"version"' in capsys.readouterr().out
+    report = json.loads(capsys.readouterr().out)
+    assert report["webview2"] is None
+    assert "webview2" in report
