@@ -89,7 +89,7 @@ Update this section whenever a new phase begins.
 
 ## Commands
 
-PowerShell, from the repository root. The installer build arrives in Phase 8.
+PowerShell, from the repository root.
 
 **Install** (once per clone, and after dependency changes):
 
@@ -150,5 +150,16 @@ Secrets are set only by the user, in their own terminal, with `npx wrangler secr
 **Test overrides:** `HABIT_TRACKER_SERVICE_URL` and `HABIT_TRACKER_NOTION_URL` point the app at a local token service and a fake Notion (the end-to-end tests use them). `PYTHON_KEYRING_BACKEND` is never needed: tests force an in-memory keyring.
 
 **Build the UI:** `npm --prefix ui run build` type-checks, then writes the single-file bundle to `ui/dist/index.html`.
+
+**Build the installer** (details in `docs/setup.md` → Building the installer):
+
+```powershell
+uv sync --group build                 # once: PyInstaller
+.\packaging\build.ps1                 # build\installer\HabitTracker-Setup-<version>.exe (+ .sha256)
+.\packaging\build.ps1 -PolicyFile packaging\test-policy.json -Suffix policytest   # newer-policy test build
+uv run python packaging\icon\make_icon.py   # after changing packaging\icon\app-icon.svg
+```
+
+Never run `packaging\test-installer.ps1` on this PC: it deletes `%APPDATA%\HabitTracker` and the saved sign-in. CI runs it. Releases: a `vX.Y.Z` tag on `main` (`docs/setup.md` → Releasing).
 
 **Database migrations:** add `app/db/migrations/NNNN_short_name.sql` with the next number. Never edit a migration that is on `main`.
