@@ -56,7 +56,7 @@ Task names are often blank at first and renamed later. **Parent Task** keeps ent
 | Start time | date | **Required** | Must include a time. |
 | End time | date, or the end of a date range in the Start time column | **Required** | Must include a time. |
 | Task name | title, rich_text | Optional | Shown as "Untitled" when blank. Never flagged. |
-| Parent task link | relation | Optional, recommended | Stored as the related page ID; shown as a clickable Notion link. |
+| Parent task link | relation | Optional, recommended | Stored as the related page ID; shown as a clickable Notion link. An entry linking several pages keeps them all (`parent_task_ids`); the first is the parent task. Several links are never an issue. |
 | Display ID | unique_id, number | Optional | A friendly label in the raw log. |
 | Logged minutes | number, formula (number) | Optional | Used **only** for validation. Durations always come from End − Start. |
 | Extra fields | any readable type | Optional, any number | Chosen by the user on the mapping screen. |
@@ -102,12 +102,12 @@ Blank task names are **not** an issue.
 ### 6.1 Quick sync (automatic, every launch)
 
 1. Run the schema check (6.3).
-2. Note the time the sync starts.
+2. Note the time the sync starts **on Notion's clock**: the `Date` header of Notion's first response in the sync (the schema check's `GET /v1/data_sources/{id}`). The PC's clock is never used, so a fast or slow PC clock can't skip edits. If that header is missing or unreadable, the newest `last_edited_time` received is used instead (never later than the true start, so always safe); if nothing was received either, the cursor isn't moved.
 3. Query the Work Log for pages whose `last_edited_time` is on or after the last successful sync **minus 5 minutes**. Notion records `last_edited_time` only to the minute, so the overlap prevents missed edits.
 4. Upsert each page into the local database and re-run validation for it.
 5. When it finishes successfully, save the start time from step 2 as the new "last successful sync". Using the start time means edits made during the sync are caught next time.
 
-Quick sync catches new entries and edits, including renamed tasks. It does **not** detect deleted entries; that is left to full sync.
+Quick sync catches new entries and edits, including renamed tasks. It does **not** detect deleted entries; that is left to full sync. Nor does it see formula or rollup values that change without the page itself being edited, so **on launch a full sync runs instead when the last full sync is more than 24 hours old** (measured on Notion's clock), when nothing has been synced yet, or when `full_sync_required` is set. Saving a mapping also starts a sync, which is full on first setup and after a change.
 
 ### 6.2 Full sync (settings button; also first-time setup)
 
@@ -115,7 +115,8 @@ Quick sync catches new entries and edits, including renamed tasks. It does **not
 2. Fetch every page in the database.
 3. Upsert all of them and re-run validation.
 4. **Only if every page was fetched successfully,** delete local entries whose page ID was not seen. A failed or interrupted full sync never deletes anything.
-5. Save both "last full sync" and "last successful sync".
+   - **Mass-removal safeguard:** if that would remove more than 50% of the local entries, or all of them, nothing is deleted yet. The app shows how many would go and the likely causes (the database is no longer shared with Habit Tracker, a different workspace, filters on the data source, or real deletions), with **Remove them** and **Keep them**. The rest of the sync's changes still apply. The question waits in `pending_removal` (11) until answered; Remove deletes only entries not copied again since; Keep clears it, and the next full sync asks again if they are still missing.
+5. Save both "last full sync" and "last successful sync" (Notion's time, as in 6.1), and clear `full_sync_required`.
 
 ### 6.3 Schema check (before every sync)
 
@@ -132,12 +133,13 @@ Quick sync catches new entries and edits, including renamed tasks. It does **not
 - **Pagination:** pages of 100 using Notion's `start_cursor`. Relation values with `has_more: true` (more than 25 references) are completed with `GET /v1/pages/{page_id}/properties/{property_id}`, paginated.
 - **Rate limits:** stay under about 3 requests per second with our own request limiter. On HTTP 429, wait for the `Retry-After` time and retry. Retry temporary network and server errors with backoff. Both retry behaviours come from `notion-client`'s retry options. Every request has an explicit timeout.
 - **Auth errors:** a 401 triggers one serialized token refresh, then a single retry (12.5). A pasted token that gets a 401 asks for a new token. Neither case ever deletes local data.
-- **Threading:** syncs run on a background thread. The UI receives progress events (pages fetched, entries added, updated or removed) and stays responsive.
+- **Threading:** syncs run on a background thread with their own SQLite connection, one at a time; a full sync asked for during a quick sync runs right after it. The app's shared connection carries a lock that every user holds. The UI receives `sync:status` events with the whole status (pages fetched, entries added, updated or removed) and stays responsive.
+- **Unreadable pages:** a page Notion sends without valid timestamps is skipped and reported; its local copy is never removed by that sync.
 - **States the UI shows:**
   - not yet synced;
   - quick sync in progress (subtle indicator);
   - full sync in progress (progress bar);
-  - completed with a summary;
+  - completed with a summary (kept in `last_sync_result`, so it is still shown after a relaunch);
   - failed with a clear reason and a retry button;
   - offline, where the app shows local data and a note that sync was skipped;
   - "Reconnect to Notion" (the refresh was rejected);
@@ -168,6 +170,7 @@ Durations always come from End − Start. Entries excluded by validation do not 
 - **Columns:** Display ID, Task name, Start, End, Duration (computed), Logged minutes, Parent task (link), the user's extra fields, and an issues indicator.
 - **Filters:** date range, task name search, parent task, duration range, has issues, and a type-appropriate filter for each extra field.
 - **Behaviour:** columns are sortable; clicking a row opens the entry in Notion in the default browser; the parent task link opens the parent page.
+- **Several parent links** (decided in Phase 5): the Parent task cell shows the first link, followed by a "+N" chip when the entry links more pages. The chip opens a small list of every linked page ("Linked page 2", …, each opening in Notion; titles aren't read, as the Task Tracker is out of scope). The parent task filter matches an entry when any of its linked pages matches. This is never shown as an issue.
 - **Issues:** red cells with hover explanations, as described in section 5.
 - **States:** empty (not yet synced), no results (filters exclude everything), and loading.
 
@@ -249,9 +252,10 @@ The database file lives at `%APPDATA%\HabitTracker\habit_tracker.db`, next to th
 | task_name | TEXT | Nullable |
 | start_utc | TEXT | ISO 8601 UTC; nullable |
 | end_utc | TEXT | ISO 8601 UTC; nullable |
-| parent_task_id | TEXT | Nullable |
+| parent_task_id | TEXT | Nullable; the first linked page |
+| parent_task_ids | TEXT | JSON list of every linked page, in Notion's order (migration 0002) |
 | logged_minutes | REAL | Nullable |
-| extra_fields | TEXT | JSON: `{property_id: {name, type, value}}` |
+| extra_fields | TEXT | JSON: `{property_id: {name, type, value}}`; values normalised by type (`app/sync/values.py`) |
 | issues | TEXT | JSON list: `[{field, code, message}]` |
 | created_time | TEXT | From Notion |
 | last_edited_time | TEXT | From Notion |
@@ -265,7 +269,7 @@ Indexes on `start_utc` and `parent_task_id`.
 - **Mapping:** `mapping`, version 1: `fields` (app field → `{property_id, part?}` or null for Not used; `part` is `start` or `end` for the date fields), `extra` (property IDs), `names_at_save` (property ID → column name, used only to word messages) and `saved_at`. Mappings are found by property ID only. `full_sync_required` (`{since, reason}`) is set when a saved mapping changes and cleared by a full sync;
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
 - **Policy:** `acknowledged_policy_version` (13);
-- **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`.
+- **Sync bookkeeping:** `last_successful_sync` and `last_full_sync` (both on Notion's clock, 6.1), `last_sync_result` (`{kind, reason, finished_at, ok, added, updated, removed, flagged, skipped, warnings, pending_removal, error}`, shown after a relaunch) and `pending_removal` (`{count, total, found_at, page_ids}`, the mass-removal question, 6.2). All are cleared with the rest of the database's data when switching databases.
 
 The local schema version is kept by the migration system (`schema_migrations` and `PRAGMA user_version`), not in `settings`.
 
@@ -446,7 +450,7 @@ habit-tracker/
 │   ├── devserver.py         # Vite dev server for dev mode
 │   ├── single_instance.py   # one running copy per data folder (named mutex)
 │   ├── notion/              # handoff, loopback listener, credentials, tokens (renewal), service client, read-only client, connection (connect, picker, logout); later: pagination, property readers
-│   ├── sync/                # schema check (Phase 4); quick sync, full sync (Phase 5)
+│   ├── sync/                # schema check, engine (quick and full sync), page values, local store
 │   ├── mapping/             # property types and samples, auto-matcher, saved mapping, review service
 │   ├── validation/          # entry checks
 │   ├── stats/               # daily totals, weeks, streaks, midnight split
@@ -469,7 +473,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
 | 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | **(a)** With a personal access token, the user connects, sees their workspace, picks their Work Log, logs out and reconnects; all CI checks pass. **(b)** The token service is deployed and its tests pass. **(c)** OAuth sign-in from the app works end to end. **(d)** OAuth sign-in from the app also works for a second Notion workspace that doesn't own the integration; if Notion blocks it pending review, what the review requires is recorded here. |
 | 4. Map | Build schema reading, auto-matching (including a single date-range column), the review screen with sample values, extra-field selection, missing-required-field errors, saving and reopening the mapping with the full-sync-required flag, and the reusable schema check (6.3). | The author's Work Log maps correctly with no manual changes and shows correct sample values; Work Log (test) maps correctly; a real Notion database with no end-time column shows the exact missing-field explanation; all CI checks pass. |
-| 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
+| 5. Sync | Implement full sync, quick sync (cursor on Notion's clock; a full sync on launch when the last is over 24 hours old), the mass-removal safeguard, validation, progress events, retries, every parent-task link, and Home's "Last sync" panel with the flagged entries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
 | 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
 | 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
@@ -622,3 +626,9 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-22 | Phase 4: new setting `full_sync_required` (`{since, reason}`), set when a saved mapping changes (not on the first save or an unchanged save), shown on Home, Settings and the mapping screen, and cleared with the database's other data when switching databases. Phase 5's full sync clears it. The `mapping` setting's shape is recorded in 11. |
 | 2026-10-22 | Phase 4 "Done when" updated: besides the tests, a real Notion database with no end-time column (created by the user) must show the exact missing-field explanation, and Work Log (test) must map correctly. This supersedes the 2026-10-17 row saying there is no separate no-end-time database; the pytest fixtures stay. |
 | 2026-10-22 | Phase 4: `tzdata` added as a dependency (planned in 10). The author's Work Log schema was checked in Notion: its ID column is named "ID" (Notion shows unique IDs as "№ ID"); section 3 updated. The UI's mapping test fixtures are generated from the Python service, and a pytest check keeps them in step. |
+| 2026-10-22 | Phase 5 plan approved, including a "Last sync" panel on Home (summary, counts, the flagged entries with their explanations and Open in Notion) so flagged entries can be checked before Phase 7's raw log, and a `last_sync_result` setting so the last outcome survives a relaunch (11). |
+| 2026-10-22 | Phase 5: the quick-sync cursor is Notion's clock, never the PC's: the `Date` header of Notion's first response in the sync (the schema check), which is Notion's time when the sync started, to the second. Fallback: the newest `last_edited_time` received (never later than the true start, so safe but less current); with neither, the cursor stays. `last_full_sync` uses the same clock. Chosen over the newest `last_edited_time` because that stops advancing when nothing is edited and is rounded to the minute. The 5-minute overlap stays (6.1). |
+| 2026-10-22 | Phase 5: on launch, a full sync runs instead of a quick sync when the last full sync is more than 24 hours old (on Notion's clock), because quick sync can't see formula and rollup values that change without editing the page. The mapping screen, Home and Settings say that formula and rollup values refresh with each full sync (6.1). |
+| 2026-10-22 | Phase 5: mass-removal safeguard. A full sync that would remove more than 50% of the local entries, or all of them, pauses before deleting, shows the count and likely causes, and asks Remove them / Keep them. The sync's other changes still apply. Stored as `pending_removal` (6.2, 11). |
+| 2026-10-22 | Phase 5: every page linked in the parent task relation is kept (`parent_task_ids`, migration 0002); the first stays `parent_task_id`. Never flagged. Phase 7 shows the first link and a "+N" list of the rest, and filters on any of them (8). Relations past 25 links are completed for the parent task and extra fields. |
+| 2026-10-22 | Phase 5 implementation details: a launch starts one "auto" sync once the work log is mapped, and saving a mapping starts one too; a full sync asked for during a quick sync runs after it; syncs use their own SQLite connection, and the shared connection carries a lock every user holds; a page without valid timestamps is skipped, reported and never removed; extra field values are normalised by type (11); a formula Logged minutes that isn't a number counts as empty. |
