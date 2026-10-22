@@ -535,7 +535,7 @@ Phase 0 is the only phase committed directly to `main`.
 
 - License: undecided. It must be chosen before the repository or app is shared publicly.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
-- Notion review for other workspaces: sign-in without review is verified only in the author's own workspace (2026-10-20). Phase 3 check (d) signs in from a second Notion account that doesn't own the connection. If Notion blocks it, record what the review requires here and in the Decisions log.
+- Notion review for other workspaces: sign-in without review is verified live only in the author's own workspace (2026-10-20). Phase 3 check (d) (a second Notion account) was accepted by the user's decision without being verified (2026-10-22). If another workspace's sign-in is ever blocked pending review, find out what Notion's review requires, record it here and in the Decisions log, and submit the connection.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
 ## 17. Decisions log
@@ -603,3 +603,4 @@ Phase 0 is the only phase committed directly to `main`.
 - **Opening links.** Only HTTPS links to Notion and the token service open in the browser. |
 | 2026-10-20 | Phase 3 UI: the app's visual style is a time sheet: Bahnschrift for headings and figures, Segoe UI Variable for text, ledger green `#2f6f5e` on a cool grey. No web fonts, so the CSP stays strict and the UI works offline. The Connect screen's hero is a week of sessions on a 24-hour strip. |
 | 2026-10-20 | Phase 3 testing: end-to-end window tests run against a fake Notion served over HTTP. For OAuth they also run the real token service locally with `wrangler dev`, with a scripted browser following the real redirects. Every test uses an in-memory keyring. The token service gets its own CI job and Dependabot entry, and pre-commit hooks for `service/`. |
+| 2026-10-22 | Phase 3 approved. The user ran checks (a), (b) and (c). Check (d), signing in from a second Notion account, was **accepted by the user's decision without being verified**. "No review needed" is confirmed live only for the author's own workspace. If sign-in from another workspace is ever blocked, it is handled then (see Open items). |
