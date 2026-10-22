@@ -7,16 +7,21 @@ port 5173 free.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
+import sqlite3
 import subprocess
 import sys
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from app.paths import HOME_ENV_VAR, ui_dist_dir
+from tests.support.notion_schemas import BROKEN_EXPECTED
 
 pytestmark = pytest.mark.gui
 
@@ -275,4 +280,52 @@ def test_dashboard_totals_match_hand_calculation(tmp_path: Path) -> None:
     assert "Overlaps Write by 30 min." in detail
     assert "Crosses midnight: split between the days it covers." in detail
     assert "Overlapping time is counted once" in detail
+    assert "ntn_" not in log
+
+
+#: Which cells each stored issue turns red (PLAN.md 5): Invalid range colours Start as well.
+def expected_red(issues: list[dict[str, str]]) -> dict[str, str]:
+    by_kind: dict[str, list[str]] = {}
+    for issue in issues:
+        field = issue["field"]
+        kinds = [field if not field.startswith("extra:") else "extra"]
+        if issue["code"] == "invalid_range":
+            kinds.insert(0, "start")
+        for kind in kinds:
+            by_kind.setdefault(kind, []).append(issue["message"])
+    return {kind: "\n".join(messages) for kind, messages in by_kind.items()}
+
+
+def test_raw_log_flags_every_broken_entry_with_its_explanation(tmp_path: Path) -> None:
+    results, log = run_harness(tmp_path, "rawlog")
+    with closing(sqlite3.connect(tmp_path / "home" / "habit_tracker.db")) as db:
+        total = db.execute("SELECT COUNT(*) FROM work_logs").fetchone()[0]
+        stored = {
+            page_id: json.loads(issues)
+            for page_id, issues in db.execute(
+                "SELECT page_id, issues FROM work_logs WHERE json_array_length(issues) > 0"
+            )
+        }
+    # The dashboard's flagged count opened the raw log filtered to entries with issues.
+    assert "Has issues" in results["chips"]
+    flagged = {page_id for page_id, codes in BROKEN_EXPECTED.items() if codes}
+    assert set(stored) == flagged
+    shown = {row["page_id"]: dict(row["red"]) for row in results["rows"]}
+    assert set(shown) == flagged
+    for page_id, issues in stored.items():
+        assert sorted(issue["code"] for issue in issues) == sorted(BROKEN_EXPECTED[page_id])
+        assert shown[page_id] == expected_red(issues), page_id
+    assert results["tooltip"] == "Logged 148 min, but Start → End is 123 min."
+    # A click selects without opening; a double-click opens that entry.
+    assert results["opened_after_click"] == []
+    assert results["opened_after_double_click"] == ["https://www.notion.so/pmismatch"]
+    # The export saved exactly the rows on screen, as UTF-8 with a BOM.
+    assert f"Exported {len(flagged)} entries" in results["export_notice"]
+    assert results["csv_bom"] is True
+    rows = list(csv.reader(io.StringIO(results["csv"], newline="")))
+    assert rows[0][2].startswith("Start (")
+    assert len(rows) == len(flagged) + 1
+    assert "Logged 148 min, but Start → End is 123 min." in {row[-1] for row in rows[1:]}
+    # Clearing the filters shows every entry again.
+    assert results["all_status"].startswith(f"{total} entries")
     assert "ntn_" not in log

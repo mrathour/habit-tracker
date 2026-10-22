@@ -170,17 +170,38 @@ Durations always come from End − Start. Entries excluded by validation do not 
 - **The week starts on Monday** by default; this can be changed in settings.
 - **Day detail:** clicking a day in any chart (or its table row) lists its sessions: times, full length, minutes counted that day, whether it crosses midnight, and any overlap with the minutes overlapped and which sessions it overlaps, plus "Open in Notion". This is how totals are checked against Notion.
 - **Accessibility:** every chart has an accessible label and a "Show as table" view.
-- **Flagged entries:** the dashboard shows the count of entries with issues, linking to Home's flagged list until Phase 7's raw log provides the "Has issues" filter.
+- **Flagged entries:** the dashboard shows the count of entries with issues, linking to the raw log with its "Has issues" filter on (8).
 - **Every chart has an empty state.** Before the first sync, when no entry can be charted, or when a range has no data, the chart says so instead of appearing broken. The figures refresh when a sync finishes.
 
 ## 8. Raw log view
 
-- **Columns:** Display ID, Task name, Start, End, Duration (computed), Logged minutes, Parent task (link), the user's extra fields, and an issues indicator.
-- **Filters:** date range, task name search, parent task, duration range, has issues, and a type-appropriate filter for each extra field.
-- **Behaviour:** columns are sortable; clicking a row opens the entry in Notion in the default browser; the parent task link opens the parent page.
+A "Raw log" tab beside Home and Settings. Rows are filtered, sorted and paged in Python (`app/rawlog/`) and the table draws only the rows in view, so it stays fast with thousands of entries.
+
+- **Columns:** Display ID, Task name, Start, End, Duration (computed from End − Start), Logged minutes, Parent task (link), the user's extra fields, Overlap, Issues, and an "Open in Notion" button. Columns for app fields mapped as "Not used" are left out. Times are shown in the computer's local time.
+- **Filters:** date range (local start date), task name search, parent task, duration range, has issues, issue type (Missing time, Invalid range, Duration mismatch, Unreadable extra field; matches any chosen), overlaps another session, and a type-appropriate filter for each extra field:
+  - text, URL, email, phone, ID, place: contains;
+  - number: min/max;
+  - checkbox: yes/no;
+  - select, status, verification, multi-select: any of the chosen options;
+  - date, created and edited times: a local date range;
+  - formula: by its result type (number, text, checkbox or date);
+  - rollup: number, date, or contains for a list.
+
+  Every extra field can also be filtered on "is empty" or "has a value". People and relations are filtered only on empty or not, because their names and titles aren't read. Filters on Duration leave out entries that have no valid range.
+- **Selecting and opening** (decided in Phase 7): a single click on a row only selects it, and the arrow keys move the selection. Each row ends with an "Open in Notion" icon button; double-clicking a row, or pressing Enter on the selected row, also opens it. Text in cells can be selected and copied. The parent task link and the "+N" list open their own pages.
+- **Sorting:** every column sorts, ascending or descending. Empty values always sort last, and ties keep the newest start first. The default is Start, newest first.
+- **Columns are remembered** (decided in Phase 7): the sort order, the column widths (dragged on the header's edge) and the columns hidden with the column picker are kept in the `raw_log_view` setting (11) across relaunches. At least one data column stays visible. Filters reset on each launch.
 - **Several parent links** (decided in Phase 5): the Parent task cell shows the first link, followed by a "+N" chip when the entry links more pages. The chip opens a small list of every linked page ("Linked page 2", …, each opening in Notion; titles aren't read, as the Task Tracker is out of scope). The parent task filter matches an entry when any of its linked pages matches. This is never shown as an issue.
-- **Issues:** red cells with hover explanations, as described in section 5.
-- **States:** empty (not yet synced), no results (filters exclude everything), and loading.
+- **Issues:** red cells with hover explanations, as described in section 5. Invalid range colours both Start and End. Each red cell also carries its explanation for screen readers, and the row's Issues cell opens the full list from the keyboard.
+- **Overlaps** (decided in Phase 7): a row whose session overlaps another counted session gets an informational marker (not red) with the overlapped minutes, listing the sessions it overlaps. It uses the dashboard's own overlap function (`app/stats/allocation.py`), on the same counted sessions, so the raw log and the day detail always agree; a test proves it. Overlaps are never an issue.
+- **CSV export** (decided in Phase 7): "Export CSV" saves exactly the rows, visible columns, column order and sorting on screen through a native Windows Save dialog run from Python.
+  - The file is UTF-8 with a BOM, so Excel opens it correctly.
+  - Times are local, written as `YYYY-MM-DD HH:MM`, with the time zone in the column header, for example "Start (Asia/Kolkata)".
+  - Durations, logged minutes and overlaps are plain numbers of minutes. Parent tasks are Notion links, and issues are their explanations; several of either are written one per line within the cell.
+  - Text that a spreadsheet would run as a formula (starting with `=`, `+`, `-`, `@`, a tab or a carriage return) is prefixed with `'`.
+  - The file is written to a temporary file next to the target and then moved into place, so a failed save never leaves a half-written file.
+  - States: nothing to export (the button is disabled, with the reason); the dialog is cancelled (nothing happens); a write error, such as the file being open in Excel (explained, with Try again); and success, showing the path with "Show in folder".
+- **States:** loading, empty (not yet synced, or a sync is copying entries now), no results (filters exclude everything, with Clear filters), an error with Try again, and refreshing after a sync finishes.
 
 ## 9. Future ideas (not in v1)
 
@@ -276,6 +297,7 @@ Indexes on `start_utc` and `parent_task_id`.
 - **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`, `workspace_icon` (`{type: "emoji" | "image", value}`; images are stored as a data URI), `account_name` (the person behind a personal access token);
 - **Mapping:** `mapping`, version 1: `fields` (app field → `{property_id, part?}` or null for Not used; `part` is `start` or `end` for the date fields), `extra` (property IDs), `names_at_save` (property ID → column name, used only to word messages) and `saved_at`. Mappings are found by property ID only. `full_sync_required` (`{since, reason}`) is set when a saved mapping changes and cleared by a full sync;
 - **Preferences:** `streak_threshold_minutes` (0 to 1440; 0 means any time), `week_start` (`monday` … `sunday`), `midnight_rule` (`split` or `start_date`), `overlap_rule` (`once` or `sum`); damaged values fall back to the defaults;
+- **Raw log:** `raw_log_view` (`{sort: {column, direction}, widths: {column: px}, hidden: [column]}`), the raw log's remembered sort, column widths and hidden columns (8). It is kept when switching databases; columns that no longer exist are ignored;
 - **Policy:** `acknowledged_policy_version` (13);
 - **Sync bookkeeping:** `last_successful_sync` and `last_full_sync` (both on Notion's clock, 6.1), `last_sync_result` (`{kind, reason, finished_at, ok, added, updated, removed, flagged, skipped, warnings, pending_removal, error}`, shown after a relaunch) and `pending_removal` (`{count, total, found_at, page_ids}`, the mass-removal question, 6.2). All are cleared with the rest of the database's data when switching databases.
 
@@ -462,6 +484,7 @@ habit-tracker/
 │   ├── mapping/             # property types and samples, auto-matcher, saved mapping, review service
 │   ├── validation/          # entry checks
 │   ├── stats/               # allocation (overlap, then midnight rule), daily totals, weeks, streaks, preferences
+│   ├── rawlog/              # the raw log: columns, filters, sorting, paging, remembered view, CSV export
 │   └── db/                  # connections, migrator, migrations/*.sql, settings, queries
 ├── ui/                      # React + Vite front end
 │   ├── src/                 # bridge/, errors/, components/, tests next to the code
@@ -483,7 +506,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 4. Map | Build schema reading, auto-matching (including a single date-range column), the review screen with sample values, extra-field selection, missing-required-field errors, saving and reopening the mapping with the full-sync-required flag, and the reusable schema check (6.3). | The author's Work Log maps correctly with no manual changes and shows correct sample values; Work Log (test) maps correctly; a real Notion database with no end-time column shows the exact missing-field explanation; all CI checks pass. |
 | 5. Sync | Implement full sync, quick sync (cursor on Notion's clock; a full sync on launch when the last is over 24 hours old), the mass-removal safeguard, validation, progress events, retries, every parent-task link, and Home's "Last sync" panel with the flagged entries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, the overlap rule, the day detail panel, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
-| 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
+| 7. Raw logs | Build the table with filters (including issue types, overlaps and every extra field), red issue cells, hover explanations, overlap markers, select-then-open Notion links, remembered sort, widths and hidden columns, and CSV export through the native Save dialog. Write tests for the filters, sorting, export and the overlap agreement with the dashboard. | Every filter works, and flagged entries show the correct explanations. |
 | 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
 
 ### 15.1 Phase 0 checklist: project setup
@@ -644,3 +667,7 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-22 | Phase 6 plan approved: (a) a day detail panel (each session's times, full and counted minutes, midnight splits, overlaps, Open in Notion) for checking totals against Notion; (b) the dashboard's flagged count links to Home's flagged list until Phase 7; (c) streak rules: today's grace (no time yet today doesn't break the current streak) and future days never count; (d) weekly chart 12/26/52 weeks (default 26), calendar last 12 months by default with a year picker. Days follow the IANA time zone the UI sends, with `zoneinfo`; no new dependency. |
 | 2026-10-22 | Phase 6: overlapping sessions. A new Dashboard setting `overlap_rule`: "Count overlapping time once" (default; overlapping time credited to the earliest-starting session, so totals are actual time and, with the split rule, no day exceeds 24 hours) or "Add every session's full time". Order: counted sessions, then the overlap rule, then the midnight rule, for both rules' options (7). The day detail marks overlapping sessions with the overlapped minutes and the sessions they overlap. Overlaps are not a validation issue. |
 | 2026-10-22 | Phase 6: charts use modular ECharts imports (canvas renderer) under the existing strict CSP, follow the app's light and dark tokens, and each has a "Show as table" view. A day's session count includes sessions whose time was fully overlapped. With the start-date rule, one session longer than a day can exceed 24 hours on its start date, as Settings explains. |
+| 2026-10-22 | Phase 7 plan approved, with three additions: (a) an issue-type filter (Missing time, Invalid range, Duration mismatch, Unreadable extra field; matches any chosen) beside "Has issues"; (b) the raw log remembers its sort order and column widths across relaunches; (c) a column picker to show or hide columns. (b) and (c) are kept in a new `raw_log_view` setting (11); filters reset on each launch. The dashboard's flagged count and Home's flagged list now open the raw log with "Has issues" on (7, 8). |
+| 2026-10-22 | Phase 7: opening Notion is a deliberate action. A single click on a row only selects it. Each row has an "Open in Notion" icon button at its end, and double-clicking or pressing Enter on the selected row also opens it. The parent task link and the "+N" list still open their pages. Cell text can be selected and copied. This replaces "clicking a row opens the entry in Notion" (8). |
+| 2026-10-22 | Phase 7: overlaps in the raw log. A row whose session overlaps another counted session gets an informational (not red) marker with the overlapped minutes, and there is an "Overlaps another session" filter. It reuses the dashboard's overlap function and its counted sessions (`app/stats/`), shared rather than reimplemented, and a test proves the raw log and the day detail agree (8). |
+| 2026-10-22 | Phase 7: CSV export of exactly the rows, columns, order and sorting on screen, through a native Windows Save dialog run from Python. UTF-8 with a BOM; local times with the time zone in the header; every state handled (nothing to export, cancelled, write error such as the file being open in Excel, success with the path). Also decided: text starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'` so a spreadsheet never runs it as a formula; the file is written to a temporary file and moved into place; "Show in folder" opens Explorer at the saved file (8). |

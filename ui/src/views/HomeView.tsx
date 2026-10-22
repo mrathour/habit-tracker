@@ -12,10 +12,13 @@ export function HomeView({
   onChangeDatabase,
   onReviewMapping,
   onPasteNewToken,
+  onShowFlagged,
 }: {
   info: ConnectionInfo;
   sync: SyncState;
   onPasteNewToken: () => void;
+  /** Open the raw log filtered to entries with issues. */
+  onShowFlagged: () => void;
   /** Set right after the mapping screen saved, to confirm it. */
   justSaved?: { fullSync: boolean } | null;
   onChangeDatabase: () => void;
@@ -45,12 +48,16 @@ export function HomeView({
           <p>{info.full_sync_required.reason} It runs with the next sync.</p>
         </div>
       )}
-      <DashboardSection sync={sync.load.status === "ready" ? sync.load.sync : null} />
+      <DashboardSection
+        sync={sync.load.status === "ready" ? sync.load.sync : null}
+        onShowFlagged={onShowFlagged}
+      />
       <SyncPanel
         info={info}
         state={sync}
         onOpenMapping={onReviewMapping}
         onPasteNewToken={onPasteNewToken}
+        onShowFlagged={onShowFlagged}
       />
       <div className="panel">
         <WorkspaceBadge info={info} />

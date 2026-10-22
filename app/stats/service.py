@@ -19,6 +19,7 @@ from app.errors import AppError
 from app.stats import preferences
 from app.stats.allocation import Session, allocate, overlap_minutes
 from app.stats.preferences import Preferences
+from app.stats.sessions import counted_session, session_label
 from app.stats.views import DayTotal, Streaks, WeekTotal, daily, streaks, weekly
 from app.sync.store import notion_url
 
@@ -26,8 +27,6 @@ DAILY_RANGES: Final = (7, 30, 90)
 WEEK_RANGES: Final = (12, 26, 52)
 #: The longest custom range the daily chart shows.
 MAX_CUSTOM_DAYS: Final = 3 * 366
-#: Issues that keep an entry out of the charts (PLAN.md 5).
-EXCLUDING_CODES: Final = ("missing_time", "invalid_range")
 
 
 class DashboardError(AppError):
@@ -189,7 +188,8 @@ class StatsService:
                     "crosses_midnight": session.end > session.start and end_local != start_local,
                     "overlap_minutes": round(overlapped, 4),
                     "overlaps_with": [
-                        {"page_id": other.page_id, "label": _label(other)} for other in others
+                        {"page_id": other.page_id, "label": session_label(other)}
+                        for other in others
                     ],
                     "url": notion_url(page_id),
                 }
@@ -217,18 +217,13 @@ class StatsService:
             issues = json.loads(issues_json)
             if issues:
                 flagged += 1
-            if any(issue.get("code") in EXCLUDING_CODES for issue in issues):
+            session = counted_session(
+                page_id, start_utc, end_utc, issues, display_id=display_id, task_name=task_name
+            )
+            if session is None:
                 excluded += 1
                 continue
-            if not start_utc or not end_utc:
-                excluded += 1  # stored without a time; validation flags it too
-                continue
-            start = datetime.fromisoformat(start_utc)
-            end = datetime.fromisoformat(end_utc)
-            if end < start:
-                excluded += 1
-                continue
-            sessions.append(Session(page_id, start, end, display_id, task_name))
+            sessions.append(session)
         return sessions, (len(rows), excluded, flagged)
 
 
@@ -289,8 +284,3 @@ def _year_ago(today: date) -> date:
 
 def _iso(moment: datetime) -> str:
     return moment.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _label(session: Session) -> str:
-    name = session.task_name or "Untitled"
-    return f"#{session.display_id} {name}" if session.display_id else name

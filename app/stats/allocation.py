@@ -131,6 +131,31 @@ def overlap_minutes(session: Session, others: Iterable[Session]) -> tuple[float,
     return total, sorted(touching, key=_priority)
 
 
+def overlaps(sessions: Sequence[Session]) -> dict[str, tuple[float, list[Session]]]:
+    """:func:`overlap_minutes` for every session that overlaps another, keyed by page ID.
+
+    One sweep in start order finds each session's overlapping partners; the minutes then come
+    from :func:`overlap_minutes` itself, so the raw log and the day detail can never disagree.
+    """
+    partners: dict[str, list[Session]] = {}
+    active: list[Session] = []
+    for session in sorted(sessions, key=_priority):
+        # Sessions that ended by this start can't overlap it or anything that starts later.
+        active = [other for other in active if other.end > session.start]
+        if session.end > session.start:
+            for other in active:
+                partners.setdefault(session.page_id, []).append(other)
+                partners.setdefault(other.page_id, []).append(session)
+            active.append(session)
+    by_id = {session.page_id: session for session in sessions}
+    result: dict[str, tuple[float, list[Session]]] = {}
+    for page_id, others in partners.items():
+        minutes, touching = overlap_minutes(by_id[page_id], others)
+        if minutes > 0:
+            result[page_id] = (minutes, touching)
+    return result
+
+
 def local_date(moment: datetime, zone: ZoneInfo) -> date:
     return moment.astimezone(zone).date()
 

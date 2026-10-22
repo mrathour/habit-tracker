@@ -32,11 +32,14 @@ export function SyncPanel({
   state,
   onOpenMapping,
   onPasteNewToken,
+  onShowFlagged,
 }: {
   info: ConnectionInfo;
   state: SyncState;
   onOpenMapping: () => void;
   onPasteNewToken: () => void;
+  /** Open the raw log filtered to entries with issues. */
+  onShowFlagged?: () => void;
 }) {
   const signIn = useSignIn(() => {
     state.start("auto");
@@ -125,7 +128,11 @@ export function SyncPanel({
             values refresh with each full sync, which runs at least once a day.
           </p>
           {load.sync.flagged > 0 && (
-            <FlaggedList key={load.sync.last_result?.finished_at ?? ""} total={load.sync.flagged} />
+            <FlaggedList
+              key={load.sync.last_result?.finished_at ?? ""}
+              total={load.sync.flagged}
+              onShowFlagged={onShowFlagged}
+            />
           )}
         </>
       )}
@@ -367,7 +374,13 @@ type ListState =
   | { status: "ready"; entries: FlaggedEntry[]; total: number; loadingMore: boolean }
   | { status: "error"; problem: Problem };
 
-function FlaggedList({ total }: { total: number }) {
+function FlaggedList({
+  total,
+  onShowFlagged,
+}: {
+  total: number;
+  onShowFlagged?: (() => void) | undefined;
+}) {
   const [list, setList] = useState<ListState>({ status: "loading" });
 
   const fetchFrom = useCallback((offset: number, previous: FlaggedEntry[]) => {
@@ -396,6 +409,13 @@ function FlaggedList({ total }: { total: number }) {
         Every entry is copied; these are left out of the charts or have a value to check. Fix them
         in Notion and they clear at the next sync.
       </p>
+      {onShowFlagged && (
+        <div className="actions">
+          <button type="button" className="button small" onClick={onShowFlagged}>
+            Open them in the raw log
+          </button>
+        </div>
+      )}
       {list.status === "loading" && (
         <p className="status" role="status">
           <span className="spinner" aria-hidden="true" /> Loading…
