@@ -44,9 +44,18 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
   - Show parent-task links as the first link plus a "+N" chip, filtering on any of them (`PLAN.md` section 8).
   - Issues are stored per entry as `[{field, code, message}]`. `invalid_range` colours both the Start and End cells.
 
-**Current: Phase 7: Raw logs**, on the branch `phase-7-raw-logs`. Scope and "Done when" are in `PLAN.md` section 15, with the raw log rules in section 8 and the issue rules in section 5. Work has not started yet: give the user a short build plan and wait for their OK.
+**Phase 7: Raw logs** is complete and approved (2026-10-22, PR #9).
+- **Back end:** `app/rawlog/` snapshots every entry (rebuilt when the data, mapping or time zone changes), then filters, sorts and pages it in Python. The sort, column widths and hidden columns are remembered in the `raw_log_view` setting.
+- **Overlaps:** the raw log and the dashboard share `app/stats/sessions.py` and `allocation.overlaps()`, which is built on `overlap_minutes()`. A test checks they agree.
+- **UI:** `ui/src/rawlog/` uses TanStack Table v9 for the columns and draws only the rows in view. A click selects a row; double-click, Enter or the ↗ button opens it. The dashboard's flagged count and Home's flagged list open the Raw log tab with "Has issues" on.
+- **CSV export:** through the native Save dialog (`app.main.save_dialog`). It writes UTF-8 with a BOM, local times as `YYYY-MM-DD HH:MM` (independent of the system locale; the screen follows the locale), guards against formulas, and writes atomically.
+- **End-to-end:** the `rawlog` scenario in `tests/e2e/window_check.py`. Rows carry `data-page-id`.
+- **Tests that format dates in the UI** must not assume a locale: CI runs in US English.
 
-**Next: Phase 8: Package** (see `PLAN.md` section 15).
+**Current: Phase 8: Package**, on the branch `phase-8-package`. Scope and "Done when" are in `PLAN.md` section 15, with packaging in section 13 and the privacy-policy change notice (`acknowledged_policy_version`, sections 11 and 13). Work has not started yet: give the user a short build plan and wait for their OK.
+- **Already in place:** Inno Setup 6 is installed with Scoop (`docs/setup.md`); `packaging/` is planned in section 14.
+- **Before releasing:** the license is still undecided (`PLAN.md` Open items). It must be chosen before the repository or app is shared publicly.
+- **Open Dependabot PRs:** #3 (`@types/node` 26) and #4 (`uv_build` 0.13) predate Phase 7. Review them with the user; don't merge without approval.
 
 Update this section whenever a new phase begins.
 
