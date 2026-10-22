@@ -318,3 +318,61 @@ def test_parent_task_ids_default_to_an_empty_list(conn: sqlite3.Connection) -> N
     assert conn.execute("SELECT parent_task_ids FROM work_logs").fetchone()[0] == "[]"
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute("UPDATE work_logs SET parent_task_ids = '{}'")
+
+
+ISSUE_JSON = '[{"field": "start", "code": "missing_time", "message": "Start time is empty."}]'
+
+
+def test_a_populated_version_1_database_upgrades_to_version_2_intact(tmp_path: Path) -> None:
+    """A Phase 4 database full of entries keeps every row, value and setting in Phase 5."""
+    path = tmp_path / "habit_tracker.db"
+    conn = connect(path)
+    version_1 = [m for m in discover() if m.version == 1]
+    migrate(conn, version_1)
+    assert current_version(conn) == 1
+    rows = [
+        {
+            "page_id": f"page-{i}",
+            "display_id": str(i) if i % 3 else None,
+            "task_name": f"Task {i}" if i % 4 else None,
+            "start_utc": "2026-10-17T12:11:00.000Z" if i % 5 else None,
+            "end_utc": "2026-10-17T12:13:00.000Z",
+            "parent_task_id": f"parent-{i % 7}" if i % 2 else None,
+            "logged_minutes": 2.5 * i,
+            "extra_fields": f'{{"mood": {{"name": "Mood", "type": "select", "value": "v{i}"}}}}',
+            "issues": ISSUE_JSON if i % 5 == 0 else "[]",
+            "created_time": "2026-10-17T12:11:00.000Z",
+            "last_edited_time": "2026-10-18T09:00:00.000Z",
+            "synced_at": "2026-10-22T10:00:00.000Z",
+        }
+        for i in range(250)
+    ]
+    with transaction(conn):
+        for row in rows:
+            conn.execute(
+                f"INSERT INTO work_logs ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",  # noqa: S608
+                list(row.values()),
+            )
+        conn.execute("INSERT INTO settings (key, value) VALUES ('mapping', '{\"version\": 1}')")
+    columns = ", ".join(rows[0])
+    before = conn.execute(f"SELECT {columns} FROM work_logs ORDER BY page_id").fetchall()  # noqa: S608
+    conn.close()
+
+    # The app opens it as it would after updating: every missing migration is applied.
+    database = open_database(path)
+    try:
+        assert database.migration.applied == (2,)
+        assert database.schema_version == 2
+        after_conn = database.connection
+        after = after_conn.execute(f"SELECT {columns} FROM work_logs ORDER BY page_id").fetchall()  # noqa: S608
+        assert [tuple(r) for r in after] == [tuple(r) for r in before]
+        assert len(after) == 250
+        assert {r[0] for r in after_conn.execute("SELECT parent_task_ids FROM work_logs")} == {"[]"}
+        assert (
+            after_conn.execute("SELECT value FROM settings WHERE key = 'mapping'").fetchone()[0]
+            == '{"version": 1}'
+        )
+        assert after_conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert after_conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    finally:
+        database.close()

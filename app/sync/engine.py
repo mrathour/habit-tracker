@@ -179,36 +179,17 @@ class SyncService:
     # --- the UI's view -------------------------------------------------------------------
 
     def status(self) -> SyncStatus:
+        """For the UI's threads: read through the app's shared connection, under its lock.
+
+        The lock is held only for these few reads. A running sync never takes it while it
+        works: it writes, and reads its own progress, through its own connection.
+        """
         with self._lock:
             progress = self._run.progress.copy() if self._run else None
-        status = self._stored_status()
+        with lock_for(self._db):
+            status = _stored_status(self._db, self._settings)
         status["running"] = progress
         return status
-
-    def _stored_status(self) -> SyncStatus:
-        """Everything but the running sync, from the settings and the local entries."""
-        with lock_for(self._db):
-            entries, flagged = store.counts(self._db)
-        pending = self._settings.get(PENDING_REMOVAL_KEY)
-        result = self._settings.get(LAST_SYNC_RESULT_KEY)
-        return {
-            "running": None,
-            "last_result": result if isinstance(result, dict) else None,  # type: ignore[typeddict-item]
-            "last_successful_sync": self._settings.get_str(LAST_SUCCESSFUL_SYNC_KEY),
-            "last_full_sync": self._settings.get_str(LAST_FULL_SYNC_KEY),
-            "entries": entries,
-            "flagged": flagged,
-            "pending_removal": (
-                {
-                    "count": int(pending["count"]),
-                    "total": int(pending["total"]),
-                    "found_at": str(pending["found_at"]),
-                }
-                if isinstance(pending, dict)
-                else None
-            ),
-            "full_sync_required": self._settings.get(FULL_SYNC_REQUIRED_KEY) is not None,
-        }
 
     def flagged_entries(self, offset: object = 0, limit: object = 50) -> FlaggedPage:
         start = offset if isinstance(offset, int) and offset >= 0 else 0
@@ -299,7 +280,7 @@ class SyncService:
             settings = Settings(conn)
             result = self._sync(run, conn, settings)
         except Exception as exc:  # noqa: BLE001 - every failure becomes a result the UI shows
-            result = self._failure(run, exc)
+            result = self._failure(run, exc, conn)
             if conn is not None:
                 Settings(conn).set(LAST_SYNC_RESULT_KEY, result)
             else:
@@ -318,7 +299,7 @@ class SyncService:
         self._emit("sync:status", self.status())
 
     def _sync(self, run: _Run, conn: sqlite3.Connection, settings: Settings) -> SyncResult:
-        self._publish(run)
+        self._publish(run, conn, settings)
         source_id = settings.get_str("data_source_id")
         if not source_id:
             raise NotReadyError("Choose your work log before syncing.")
@@ -334,7 +315,7 @@ class SyncService:
         kind, reason = self._choose_kind(run.requested, settings, now)
         run.progress["kind"] = kind
         run.progress["phase"] = "fetching"
-        self._publish(run)
+        self._publish(run, conn, settings)
         logger.info("%s sync started (%s)", kind.capitalize(), reason)
 
         local_before = store.page_ids(conn)
@@ -377,7 +358,7 @@ class SyncService:
             run.progress["pages_fetched"] += len(rows)
             run.progress["added"] += counts.added
             run.progress["updated"] += counts.updated
-            self._publish(run)
+            self._publish(run, conn, settings)
             next_cursor = page.get("next_cursor")
             if not page.get("has_more") or not isinstance(next_cursor, str):
                 break
@@ -389,7 +370,7 @@ class SyncService:
         if kind == "full":
             missing = local_before - seen
             run.progress["phase"] = "removing"
-            self._publish(run)
+            self._publish(run, conn, settings)
             if missing and _is_mass_removal(len(missing), len(local_before)):
                 pending_count = len(missing)
                 updates[PENDING_REMOVAL_KEY] = {
@@ -483,7 +464,9 @@ class SyncService:
                     value["relation"] = ids
                     value["has_more"] = False
 
-    def _failure(self, run: _Run, exc: BaseException) -> SyncResult:
+    def _failure(
+        self, run: _Run, exc: BaseException, conn: sqlite3.Connection | None
+    ) -> SyncResult:
         report = report_exception(exc, context=f"{run.requested} sync")
         issues = (
             [issue.to_dict() for issue in exc.check.blocking]
@@ -498,7 +481,7 @@ class SyncService:
             "added": run.progress["added"],
             "updated": run.progress["updated"],
             "removed": run.progress["removed"],
-            "flagged": self._flagged_count(),
+            "flagged": store.counts(conn)[1] if conn is not None else self._flagged_count(),
             "skipped": 0,
             "warnings": [],
             "pending_removal": None,
@@ -514,8 +497,36 @@ class SyncService:
         with lock_for(self._db):
             return store.counts(self._db)[1]
 
-    def _publish(self, run: _Run) -> None:
-        self._emit("sync:status", self.status())
+    def _publish(self, run: _Run, conn: sqlite3.Connection, settings: Settings) -> None:
+        """Push progress, read through the sync's own connection: never the shared one."""
+        status = _stored_status(conn, settings)
+        status["running"] = run.progress.copy()
+        self._emit("sync:status", status)
+
+
+def _stored_status(conn: sqlite3.Connection, settings: Settings) -> SyncStatus:
+    """Everything but the running sync, from the settings and the local entries on ``conn``."""
+    entries, flagged = store.counts(conn)
+    pending = settings.get(PENDING_REMOVAL_KEY)
+    result = settings.get(LAST_SYNC_RESULT_KEY)
+    return {
+        "running": None,
+        "last_result": result if isinstance(result, dict) else None,  # type: ignore[typeddict-item]
+        "last_successful_sync": settings.get_str(LAST_SUCCESSFUL_SYNC_KEY),
+        "last_full_sync": settings.get_str(LAST_FULL_SYNC_KEY),
+        "entries": entries,
+        "flagged": flagged,
+        "pending_removal": (
+            {
+                "count": int(pending["count"]),
+                "total": int(pending["total"]),
+                "found_at": str(pending["found_at"]),
+            }
+            if isinstance(pending, dict)
+            else None
+        ),
+        "full_sync_required": settings.get(FULL_SYNC_REQUIRED_KEY) is not None,
+    }
 
 
 def _is_mass_removal(missing: int, total: int) -> bool:

@@ -48,8 +48,8 @@ _FALLBACK_LOCK = threading.RLock()
 
 def lock_for(conn: sqlite3.Connection) -> threading.RLock:
     """The lock to hold while using ``conn`` (reentrant, so nested users are fine)."""
-    lock = getattr(conn, "lock", None)
-    return lock if isinstance(lock, type(_FALLBACK_LOCK)) else _FALLBACK_LOCK
+    lock: threading.RLock | None = getattr(conn, "lock", None)
+    return lock if lock is not None else _FALLBACK_LOCK
 
 
 def connect(path: Path | str) -> sqlite3.Connection:

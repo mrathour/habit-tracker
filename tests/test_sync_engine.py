@@ -623,3 +623,133 @@ def test_switching_databases_forgets_sync_state(harness: Harness) -> None:
     assert status["last_result"] is None
     assert status["last_successful_sync"] is None
     assert status["entries"] == 0
+
+
+# --- the UI stays responsive ------------------------------------------------------------------
+
+
+def test_ui_reads_stay_responsive_during_a_large_full_sync(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 5,000-entry full sync never holds the app's shared connection while it works.
+
+    The sync writes, and reads its own progress, through its own connection (WAL lets the UI
+    read meanwhile). The shared connection's lock guards only the UI side's short reads. This
+    checks both: the lock is free during every upsert, and the UI's reads and a settings write
+    stay fast for the whole sync.
+    """
+    import statistics
+    import threading
+    import time
+
+    from app.db.connection import lock_for
+    from app.sync import store as sync_store
+
+    source = work_log_schema()
+    rows = [
+        page(
+            source,
+            {
+                "Name": rich(f"Session {i}"),
+                "Start Time": when(f"2026-{1 + i % 12:02d}-{1 + i % 28:02d}T09:00:00.000Z"),
+                "End Time": when(f"2026-{1 + i % 12:02d}-{1 + i % 28:02d}T10:00:00.000Z"),
+                "MinuteSpent": 60 if i % 10 else 90,  # every tenth is flagged
+            },
+            created="2025-01-01T00:00:00.000Z",
+            page_id=f"page-{i:05d}",
+        )
+        for i in range(5000)
+    ]
+    harness.use(source, rows)
+
+    # Notion answers each page of 100 after 40 ms, so the sync lasts a few seconds.
+    original_query = harness.notion._query
+
+    def slow_query(source_obj: Any, body: dict[str, Any]) -> httpx.Response:
+        time.sleep(0.04)
+        return original_query(source_obj, body)
+
+    harness.notion._query = slow_query  # type: ignore[method-assign,assignment]
+
+    main = harness.database.connection
+
+    class RecordingLock:
+        """The shared connection's lock, noting which threads take it during the sync."""
+
+        def __init__(self, inner: Any) -> None:
+            self.inner = inner
+            self.taken_by_sync_while_running: list[str] = []
+
+        def _note(self) -> None:
+            name = threading.current_thread().name
+            if name.startswith("sync-") and harness.sync._run is not None:
+                self.taken_by_sync_while_running.append(name)
+
+        def acquire(self, *args: Any, **kwargs: Any) -> bool:
+            self._note()
+            return bool(self.inner.acquire(*args, **kwargs))
+
+        def release(self) -> None:
+            self.inner.release()
+
+        def __enter__(self) -> bool:
+            return self.acquire()
+
+        def __exit__(self, *exc: object) -> None:
+            self.release()
+
+        def _is_owned(self) -> bool:
+            return bool(self.inner._is_owned())
+
+    recording = RecordingLock(main.lock)  # type: ignore[attr-defined]
+    main.lock = recording  # type: ignore[attr-defined]
+    harness.settings._lock = recording  # type: ignore[assignment]
+    lock_free: list[bool] = []
+    own_connection: list[bool] = []
+    original_upsert = sync_store.upsert
+
+    def checked_upsert(conn: Any, entries: Any, synced_at: str) -> sync_store.UpsertCounts:
+        own_connection.append(conn is not main)
+        # Runs on the sync thread: it must not own the shared connection's lock here.
+        lock_free.append(not lock_for(main)._is_owned())  # type: ignore[attr-defined]
+        return original_upsert(conn, entries, synced_at)
+
+    monkeypatch.setattr(sync_store, "upsert", checked_upsert)
+
+    latencies: list[float] = []
+    write_latencies: list[float] = []
+    seen_running = 0
+    harness.sync.start("full")
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        began = time.perf_counter()
+        status = harness.sync.status()
+        harness.sync.flagged_entries(0, 50)
+        latencies.append(time.perf_counter() - began)
+        began = time.perf_counter()
+        harness.settings.set("week_start", "monday")
+        write_latencies.append(time.perf_counter() - began)
+        if status["running"] is None:
+            break
+        seen_running += 1
+        time.sleep(0.01)
+    assert harness.sync.wait(120)
+
+    result = harness.sync.status()["last_result"]
+    assert result is not None
+    assert result["ok"]
+    assert result["added"] == 5000
+    assert result["flagged"] == 500
+    assert len(own_connection) == 50
+    assert all(own_connection), "the sync wrote through the app's shared connection"
+    assert all(lock_free), "the sync thread held the shared connection's lock during an upsert"
+    assert recording.taken_by_sync_while_running == [], "the sync used the shared connection"
+    print(  # noqa: T201 - shown with -s, for the record
+        f"{len(latencies)} UI reads during the sync: median "
+        f"{statistics.median(latencies) * 1000:.1f} ms, max {max(latencies) * 1000:.1f} ms; "
+        f"settings writes max {max(write_latencies) * 1000:.1f} ms"
+    )
+    assert seen_running >= 20, f"too few reads overlapped the sync ({seen_running})"
+    assert max(latencies) < 0.5, f"slowest UI read took {max(latencies):.3f}s"
+    assert statistics.median(latencies) < 0.05
+    assert max(write_latencies) < 0.5, f"slowest settings write took {max(write_latencies):.3f}s"
