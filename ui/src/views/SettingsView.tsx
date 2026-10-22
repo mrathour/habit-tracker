@@ -17,12 +17,14 @@ export function SettingsView({
   appInfo,
   onConnectionChanged,
   onChangeDatabase,
+  onReviewMapping,
   focusAdvanced = false,
 }: {
   info: ConnectionInfo;
   appInfo: AppInfoState;
   onConnectionChanged: (info: ConnectionInfo | null) => void;
   onChangeDatabase: () => void;
+  onReviewMapping: () => void;
   focusAdvanced?: boolean;
 }) {
   const [disconnecting, setDisconnecting] = useState(false);
@@ -56,11 +58,27 @@ export function SettingsView({
               <dd>{authKindLabel(info.auth_kind)}</dd>
               <dt>Work log</dt>
               <dd>{info.database_title ?? "Not chosen yet"}</dd>
+              {info.data_source_id && (
+                <>
+                  <dt>Columns</dt>
+                  <dd>
+                    {info.mapping_saved ? "Mapped" : "Not mapped yet"}
+                    {info.full_sync_required && (
+                      <span className="chip warn">Full sync required</span>
+                    )}
+                  </dd>
+                </>
+              )}
             </dl>
             <div className="actions">
               <button type="button" className="button" onClick={onChangeDatabase}>
                 {info.database_title ? "Choose a different database" : "Choose your work log"}
               </button>
+              {info.data_source_id && (
+                <button type="button" className="button" onClick={onReviewMapping}>
+                  {info.mapping_saved ? "Review column mapping" : "Map your columns"}
+                </button>
+              )}
               <button
                 type="button"
                 className="button danger"

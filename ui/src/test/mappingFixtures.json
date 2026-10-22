@@ -1,0 +1,1601 @@
+{
+  "ambiguous": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "d1",
+        "name": "Date",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "d2",
+        "name": "Date 2",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "p1",
+        "name": "Project",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "relation",
+        "type_label": "Relation"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "p2",
+        "name": "Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "relation",
+        "type_label": "Relation"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Ambiguous",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [
+          "d1",
+          "d2"
+        ],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Date",
+            "part": "start",
+            "property_id": "d1"
+          },
+          {
+            "label": "Date 2",
+            "part": "start",
+            "property_id": "d2"
+          }
+        ],
+        "required": true,
+        "selection": null,
+        "status": "choose"
+      },
+      {
+        "choose_from": [
+          "d1",
+          "d2"
+        ],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Date",
+            "part": "start",
+            "property_id": "d1"
+          },
+          {
+            "label": "Date 2",
+            "part": "start",
+            "property_id": "d2"
+          },
+          {
+            "label": "End of the date range in “Date”",
+            "part": "end",
+            "property_id": "d1"
+          },
+          {
+            "label": "End of the date range in “Date 2”",
+            "part": "end",
+            "property_id": "d2"
+          }
+        ],
+        "required": true,
+        "selection": null,
+        "status": "choose"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [
+          "p1",
+          "p2"
+        ],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Project",
+            "part": null,
+            "property_id": "p1"
+          },
+          {
+            "label": "Task",
+            "part": null,
+            "property_id": "p2"
+          }
+        ],
+        "required": false,
+        "selection": null,
+        "status": "choose"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "status": "unused"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "status": "unused"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 0,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  },
+  "changed": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%7BmH%40",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "unique_id",
+        "type_label": "ID"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%3DjVp",
+        "name": "Began at",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "ZCx%3F",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "fmJa",
+        "name": "Parent Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "relation",
+        "type_label": "Relation"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Began at",
+            "part": "start",
+            "property_id": "%3DjVp"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "%3DjVp"
+        },
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": "The column “End Time” used for End time no longer exists in Notion, so syncing can't start. Choose another column for End time on the mapping screen.",
+        "missing_help": "Your database needs a second Date column to use as the end time. In Notion, add a Date column for when each session ends and turn on “Include time”. Or, if “Began at” holds each session as a date range (start → end), choose “End of the date range in “Began at”” for End time.",
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Began at",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End of the date range in “Began at”",
+            "part": "end",
+            "property_id": "%3DjVp"
+          }
+        ],
+        "required": true,
+        "selection": null,
+        "status": "removed"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Parent Task",
+            "part": null,
+            "property_id": "fmJa"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "fmJa"
+        },
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "%7BmH%40"
+          },
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "%7BmH%40"
+        },
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "ZCx%3F"
+        },
+        "status": "saved"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 0,
+    "sample_limit": 25,
+    "saved": true,
+    "saved_at": "2026-10-22T10:00:00.000Z",
+    "schema_check": {
+      "blocking": [
+        {
+          "code": "required_missing",
+          "field": "end",
+          "message": "The column “End Time” used for End time no longer exists in Notion, so syncing can't start. Choose another column for End time on the mapping screen.",
+          "property_id": "Q%5Ckh"
+        }
+      ],
+      "ok": false,
+      "renamed": [
+        {
+          "new_name": "Began at",
+          "old_name": "Start Time",
+          "property_id": "%3DjVp"
+        }
+      ],
+      "warnings": [
+        {
+          "code": "extra_missing",
+          "field": null,
+          "message": "The additional column “Mood” no longer exists in Notion. Syncing continues without it.",
+          "property_id": "mood"
+        }
+      ]
+    }
+  },
+  "empty": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%7BmH%40",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "unique_id",
+        "type_label": "ID"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%3DjVp",
+        "name": "Start Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "Q%5Ckh",
+        "name": "End Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "ZCx%3F",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "fmJa",
+        "name": "Parent Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [],
+        "type": "relation",
+        "type_label": "Relation"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "Q%5Ckh"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "%3DjVp"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "Q%5Ckh"
+          },
+          {
+            "label": "End of the date range in “Start Time”",
+            "part": "end",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End of the date range in “End Time”",
+            "part": "end",
+            "property_id": "Q%5Ckh"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "Q%5Ckh"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Parent Task",
+            "part": null,
+            "property_id": "fmJa"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "fmJa"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "%7BmH%40"
+          },
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "%7BmH%40"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "ZCx%3F"
+        },
+        "status": "auto"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 0,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  },
+  "noEnd": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%7BmH%40",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "8"
+          },
+          {
+            "kind": "text",
+            "text": "7"
+          },
+          {
+            "kind": "text",
+            "text": "6"
+          }
+        ],
+        "type": "unique_id",
+        "type_label": "ID"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Writing EVA resume"
+          },
+          {
+            "kind": "text",
+            "text": "Work Log Table Created"
+          }
+        ],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%3DjVp",
+        "name": "Start Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-21",
+              "has_time": true,
+              "utc": "2026-10-21T06:08:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-20",
+              "has_time": true,
+              "utc": "2026-10-20T01:22:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-17",
+              "has_time": true,
+              "utc": "2026-10-17T12:11:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "ZCx%3F",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "37"
+          },
+          {
+            "kind": "text",
+            "text": "128"
+          },
+          {
+            "kind": "text",
+            "text": "2"
+          }
+        ],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "fmJa",
+        "name": "Parent Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          },
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          },
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          }
+        ],
+        "type": "relation",
+        "type_label": "Relation"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log (no end)",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "%3DjVp"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": "Your database needs a second Date column to use as the end time. In Notion, add a Date column for when each session ends and turn on “Include time”. Or, if “Start Time” holds each session as a date range (start → end), choose “End of the date range in “Start Time”” for End time.",
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End of the date range in “Start Time”",
+            "part": "end",
+            "property_id": "%3DjVp"
+          }
+        ],
+        "required": true,
+        "selection": null,
+        "status": "missing"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Parent Task",
+            "part": null,
+            "property_id": "fmJa"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "fmJa"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "%7BmH%40"
+          },
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "%7BmH%40"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "ZCx%3F"
+        },
+        "status": "auto"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 3,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  },
+  "range": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 1,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Planning"
+          }
+        ],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 1,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": true,
+        "id": "s%3A1",
+        "name": "Session",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": {
+              "date": "2026-10-21",
+              "has_time": true,
+              "utc": "2026-10-21T04:45:00.000Z"
+            },
+            "kind": "date",
+            "start": {
+              "date": "2026-10-21",
+              "has_time": true,
+              "utc": "2026-10-21T03:30:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-20",
+              "has_time": false,
+              "utc": null
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Sessions",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Session",
+            "part": "start",
+            "property_id": "s%3A1"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "s%3A1"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": "Your database needs a second Date column to use as the end time. In Notion, add a Date column for when each session ends and turn on “Include time”. Or, if “Session” holds each session as a date range (start → end), choose “End of the date range in “Session”” for End time.",
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Session",
+            "part": "start",
+            "property_id": "s%3A1"
+          },
+          {
+            "label": "End of the date range in “Session”",
+            "part": "end",
+            "property_id": "s%3A1"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "end",
+          "property_id": "s%3A1"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "status": "unused"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "status": "unused"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "status": "unused"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 2,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  },
+  "workLog": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%7BmH%40",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "8"
+          },
+          {
+            "kind": "text",
+            "text": "7"
+          },
+          {
+            "kind": "text",
+            "text": "6"
+          }
+        ],
+        "type": "unique_id",
+        "type_label": "ID"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Writing EVA resume"
+          },
+          {
+            "kind": "text",
+            "text": "Work Log Table Created"
+          }
+        ],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "%3DjVp",
+        "name": "Start Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-21",
+              "has_time": true,
+              "utc": "2026-10-21T06:08:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-20",
+              "has_time": true,
+              "utc": "2026-10-20T01:22:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-17",
+              "has_time": true,
+              "utc": "2026-10-17T12:11:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "Q%5Ckh",
+        "name": "End Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-21",
+              "has_time": true,
+              "utc": "2026-10-21T06:45:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-20",
+              "has_time": true,
+              "utc": "2026-10-20T03:30:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-17",
+              "has_time": true,
+              "utc": "2026-10-17T12:13:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "ZCx%3F",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "37"
+          },
+          {
+            "kind": "text",
+            "text": "128"
+          },
+          {
+            "kind": "text",
+            "text": "2"
+          }
+        ],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 3,
+        "formula_types": [],
+        "has_range": false,
+        "id": "fmJa",
+        "name": "Parent Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          },
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          },
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          }
+        ],
+        "type": "relation",
+        "type_label": "Relation"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 1,
+        "formula_types": [],
+        "has_range": false,
+        "id": "mood",
+        "name": "Mood",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Focused"
+          }
+        ],
+        "type": "select",
+        "type_label": "Select"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "btn",
+        "name": "Log it",
+        "note": null,
+        "readable": false,
+        "reason": "Buttons run actions in Notion and hold no value, so there's nothing to read.",
+        "samples": [],
+        "type": "button",
+        "type_label": "Button"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "legacy",
+        "name": "Legacy",
+        "note": null,
+        "readable": false,
+        "reason": "Notion doesn't share this kind of property through its API, so Habit Tracker can't read it.",
+        "samples": [],
+        "type": "unsupported",
+        "type_label": "Unsupported"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "Q%5Ckh"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "%3DjVp"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "Q%5Ckh"
+          },
+          {
+            "label": "End of the date range in “Start Time”",
+            "part": "end",
+            "property_id": "%3DjVp"
+          },
+          {
+            "label": "End of the date range in “End Time”",
+            "part": "end",
+            "property_id": "Q%5Ckh"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "Q%5Ckh"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Parent Task",
+            "part": null,
+            "property_id": "fmJa"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "fmJa"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "%7BmH%40"
+          },
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "%7BmH%40"
+        },
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "ZCx%3F"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "ZCx%3F"
+        },
+        "status": "auto"
+      }
+    ],
+    "full_sync_required": null,
+    "rows_sampled": 3,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  }
+}
