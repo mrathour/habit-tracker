@@ -10,6 +10,9 @@ Every request:
 * is retried by ``notion-client`` on 429 (honouring ``Retry-After``) and on 5xx for GETs, and by
   this class on 5xx for read-only POSTs (search, query), which ``notion-client`` won't retry;
 * on a 401, renews the access once through :class:`~app.notion.tokens.TokenManager` and retries.
+
+Every response's ``Date`` header is remembered per thread (:meth:`NotionReader.server_time`), so
+a sync can keep its bookkeeping on Notion's clock instead of the PC's (PLAN.md 6.1).
 """
 
 from __future__ import annotations
@@ -18,6 +21,8 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, Final, TypeVar
 
 import httpx
@@ -82,12 +87,16 @@ class NotionReader:
         self._tokens = tokens
         self._limiter = limiter or RateLimiter()
         self._sleep = sleep
+        self._local = threading.local()
+        transport = http or httpx.Client(
+            timeout=REQUEST_TIMEOUT_MS / 1000,
+            headers={"User-Agent": f"HabitTracker/{__version__}"},
+        )
+        hooks = transport.event_hooks
+        hooks["response"] = [*hooks.get("response", []), self._remember_server_time]
+        transport.event_hooks = hooks
         self._client = Client(
-            client=http
-            or httpx.Client(
-                timeout=REQUEST_TIMEOUT_MS / 1000,
-                headers={"User-Agent": f"HabitTracker/{__version__}"},
-            ),
+            client=transport,
             base_url=base_url,
             notion_version=NOTION_VERSION,
             timeout_ms=REQUEST_TIMEOUT_MS,
@@ -124,6 +133,7 @@ class NotionReader:
         page_size: int = 100,
         start_cursor: str | None = None,
         sorts: list[dict[str, str]] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002 - Notion's parameter name
     ) -> dict[str, Any]:
         """One page of rows: ``POST /v1/data_sources/{id}/query`` (a read, despite the POST)."""
         body: dict[str, Any] = {"page_size": page_size}
@@ -131,10 +141,52 @@ class NotionReader:
             body["start_cursor"] = start_cursor
         if sorts:
             body["sorts"] = sorts
+        if filter:
+            body["filter"] = filter
         return self._call(
             lambda auth: self._client.data_sources.query(data_source_id, auth=auth, **body),
             post=True,
         )
+
+    def retrieve_property_item(
+        self, page_id: str, property_id: str, start_cursor: str | None = None
+    ) -> dict[str, Any]:
+        """One page of a property's values: ``GET /v1/pages/{id}/properties/{property_id}``.
+
+        Used to complete relations with more than 25 links (``has_more``), 100 at a time.
+        """
+        extra: dict[str, Any] = {"page_size": 100}
+        if start_cursor:
+            extra["start_cursor"] = start_cursor
+        return self._call(
+            lambda auth: self._client.pages.properties.retrieve(
+                page_id=page_id, property_id=property_id, auth=auth, **extra
+            )
+        )
+
+    # --- Notion's clock -----------------------------------------------------------------
+
+    def server_time(self) -> datetime | None:
+        """Notion's time from the ``Date`` header of this thread's latest response, in UTC."""
+        value = getattr(self._local, "server_time", None)
+        return value if isinstance(value, datetime) else None
+
+    def forget_server_time(self) -> None:
+        """Start afresh, so :meth:`server_time` only reports responses that come later."""
+        self._local.server_time = None
+
+    def _remember_server_time(self, response: httpx.Response) -> None:
+        header = response.headers.get("Date")
+        if not header:
+            return
+        try:
+            moment = parsedate_to_datetime(header)
+        except (TypeError, ValueError, IndexError):
+            logger.debug("Ignored an unreadable Date header")
+            return
+        if moment.tzinfo is None:
+            return  # RFC 9110 dates are always GMT; anything else isn't trusted
+        self._local.server_time = moment.astimezone(UTC)
 
     # --- plumbing -------------------------------------------------------------------------
 

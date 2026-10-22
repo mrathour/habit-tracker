@@ -11,7 +11,10 @@ import re
 import threading
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from email.utils import format_datetime
 from typing import Any
+from urllib.parse import parse_qs
 
 import httpx
 
@@ -61,6 +64,13 @@ class FakeNotion:
     page_size: int = 100
     #: Queue of forced responses for the next requests, e.g. a 503 or a network error.
     next_failures: list[httpx.Response | Exception] = field(default_factory=list)
+    #: Notion's clock. None means the real time; tests set it to move Notion's time around
+    #: independently of the PC's clock.
+    server_now: datetime | None = None
+    #: Send a ``Date`` header with every response, as Notion does.
+    send_date: bool = True
+    #: Every link of relations with more than 25: (page ID, property ID) -> page IDs.
+    relation_overflow: dict[tuple[str, str], list[str]] = field(default_factory=dict)
     #: Users/me shape: "bot" for OAuth and internal tokens, "person" for personal tokens.
     me_type: str = "bot"
     requests: list[httpx.Request] = field(default_factory=list)
@@ -85,7 +95,16 @@ class FakeNotion:
 
     # --- the handler ----------------------------------------------------------------------
 
+    def now(self) -> datetime:
+        return self.server_now or datetime.now(UTC)
+
     def handle(self, request: httpx.Request) -> httpx.Response:
+        response = self._handle(request)
+        if self.send_date and "Date" not in response.headers:
+            response.headers["Date"] = format_datetime(self.now().astimezone(UTC), usegmt=True)
+        return response
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
         with self.lock:
             self.requests.append(request)
             if self.next_failures:
@@ -144,6 +163,8 @@ class FakeNotion:
             if database is None or database.id in self.unshared | self.unreadable_databases:
                 return notion_error(404, "object_not_found")
             return httpx.Response(200, json=self.database_json(database))
+        if match := re.fullmatch(r"/v1/pages/([^/]+)/properties/([^/]+)", path):
+            return self._property_item(match[1], match[2], parse_qs(request.url.query.decode()))
         if match := re.fullmatch(r"/v1/data_sources/([^/]+)/query", path):
             source = self.data_sources.get(match[1])
             if source is None or source.database_id in self.unshared:
@@ -176,7 +197,16 @@ class FakeNotion:
         )
 
     def _query(self, source: FakeDataSource, body: dict[str, Any]) -> httpx.Response:
-        rows = list(source.pages)
+        rows = [page for page in source.pages if not page.get("in_trash")]
+        query_filter = body.get("filter")
+        if query_filter:
+            edited = query_filter.get("last_edited_time", {})
+            if query_filter.get("timestamp") != "last_edited_time" or "on_or_after" not in edited:
+                return notion_error(400, "validation_error", "the fake filters only edits")
+            since = datetime.fromisoformat(edited["on_or_after"])
+            rows = [
+                page for page in rows if datetime.fromisoformat(page["last_edited_time"]) >= since
+            ]
         sorts = body.get("sorts") or []
         if sorts:
             if sorts != [{"timestamp": "created_time", "direction": "descending"}]:
@@ -196,6 +226,68 @@ class FakeNotion:
                 "type": "page_or_data_source",
             },
         )
+
+    def _property_item(
+        self, page_id: str, property_id: str, query: dict[str, list[str]]
+    ) -> httpx.Response:
+        links = self.relation_overflow.get((page_id, property_id))
+        if links is None:
+            return notion_error(404, "object_not_found")
+        start = int((query.get("start_cursor") or ["0"])[0])
+        size = min(int((query.get("page_size") or ["25"])[0]), 100)
+        chunk = links[start : start + size]
+        more = start + size < len(links)
+        return httpx.Response(
+            200,
+            json={
+                "object": "list",
+                "results": [
+                    {"object": "property_item", "id": property_id, "type": "relation",
+                     "relation": {"id": link}}
+                    for link in chunk
+                ],
+                "has_more": more,
+                "next_cursor": str(start + size) if more else None,
+                "type": "property_item",
+                "property_item": {"id": property_id, "type": "relation", "relation": {}},
+            },
+        )  # fmt: skip
+
+    # --- changing rows, as the user would in Notion ------------------------------------------
+
+    def edited_stamp(self) -> str:
+        """``last_edited_time`` for an edit now: Notion keeps it only to the minute."""
+        moment = self.now().astimezone(UTC).replace(second=0, microsecond=0)
+        return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+    def find_page(self, page_id: str) -> tuple[FakeDataSource, dict[str, Any]]:
+        for source in self.data_sources.values():
+            for page in source.pages:
+                if page["id"] == page_id:
+                    return source, page
+        raise KeyError(page_id)
+
+    def edit_page(self, page_id: str, **values: Any) -> None:
+        """Change column values (by column name) and stamp the edit with Notion's clock."""
+        _source, page = self.find_page(page_id)
+        for name, value in values.items():
+            entry = page["properties"][name]
+            entry[entry["type"]] = value
+        page["last_edited_time"] = self.edited_stamp()
+
+    def delete_page(self, page_id: str) -> None:
+        """Move a page to the trash: queries stop returning it."""
+        _source, page = self.find_page(page_id)
+        page["in_trash"] = True
+        page["last_edited_time"] = self.edited_stamp()
+
+    def link_many(self, page_id: str, column: str, links: list[str]) -> None:
+        """Give a relation more links than a page object shows (Notion shows 25)."""
+        _source, page = self.find_page(page_id)
+        entry = page["properties"][column]
+        entry["relation"] = [{"id": link} for link in links[:25]]
+        entry["has_more"] = len(links) > 25
+        self.relation_overflow[(page_id, entry["id"])] = list(links)
 
     def database_json(self, database: FakeDatabase) -> dict[str, Any]:
         return {

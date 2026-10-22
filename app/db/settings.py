@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from collections.abc import Iterable
 from typing import Final
 
-from app.db.connection import transaction
+from app.db.connection import lock_for, transaction
 
 #: Where the app reads Notion from.
 SOURCE_KEYS: Final = ("database_id", "data_source_id", "database_title")
@@ -30,6 +29,8 @@ SOURCE_DATA_KEYS: Final = (
     FULL_SYNC_REQUIRED_KEY,
     "last_successful_sync",
     "last_full_sync",
+    "last_sync_result",
+    "pending_removal",
 )
 
 #: Words a token must never be stored under, as a guard against mistakes.
@@ -39,7 +40,7 @@ _FORBIDDEN_FRAGMENTS: Final = ("token", "secret", "password")
 class Settings:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
-        self._lock = threading.Lock()
+        self._lock = lock_for(conn)
 
     def get(self, key: str, default: object = None) -> object:
         with self._lock:

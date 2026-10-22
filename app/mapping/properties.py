@@ -56,6 +56,14 @@ _NOTES: Final[dict[str, str]] = {
     ),
     "relation": "Linked pages are kept as links; their titles aren't read.",
     "files": "Only file names are kept, because Notion's file links expire.",
+    "formula": (
+        "Refreshed by each full sync (at least once a day): Notion doesn't mark a page as edited "
+        "when only a formula's result changes."
+    ),
+    "rollup": (
+        "Refreshed by each full sync (at least once a day): Notion doesn't mark a page as edited "
+        "when only a rollup's result changes."
+    ),
 }
 
 

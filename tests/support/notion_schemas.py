@@ -207,3 +207,72 @@ def add_source(
     notion.data_sources[source_id].properties = properties
     notion.data_sources[source_id].pages = rows or []
     return database, source_id
+
+
+def broken_rows(properties: Schema | None = None) -> list[dict[str, Any]]:
+    """One row per validation case (PLAN.md 5), with page IDs that name the case.
+
+    ``BROKEN_EXPECTED`` lists the issue codes each must get. A blank name is not an issue.
+    """
+    source = properties or work_log_schema()
+    names = {spec["id"]: name for name, spec in source.items()}
+
+    def row(page_id: str, **by_original_name: Any) -> dict[str, Any]:
+        values = {
+            names[WORK_LOG_IDS[name]]: value
+            for name, value in by_original_name.items()
+            if WORK_LOG_IDS[name] in names
+        }
+        return page(source, values, created="2026-10-21T08:00:00.000Z", page_id=page_id)
+
+    task = [{"id": TASK_PAGE}]
+    start = "2026-10-21T09:00:00.000+05:30"
+    return [
+        row(
+            "p-ok",
+            Name=rich("Fine"),
+            **{
+                "Start Time": when(start),
+                "End Time": when("2026-10-21T10:00:00.000+05:30"),
+                "MinuteSpent": 60.5,
+                "Parent Task": task,
+            },
+        ),
+        row("p-blank-name", **{"Start Time": when(start), "End Time": when(start)}),
+        row("p-no-end", Name=rich("No end"), **{"Start Time": when(start), "MinuteSpent": 30}),
+        row("p-no-start", Name=rich("No start"), **{"End Time": when(start)}),
+        row(
+            "p-reversed",
+            Name=rich("Reversed"),
+            **{
+                "Start Time": when(start),
+                "End Time": when("2026-10-21T08:53:00.000+05:30"),
+                "MinuteSpent": 999,
+            },
+        ),
+        row(
+            "p-mismatch",
+            Name=rich("Mismatch"),
+            **{
+                "Start Time": when(start),
+                "End Time": when("2026-10-21T11:03:00.000+05:30"),
+                "MinuteSpent": 148,
+            },
+        ),
+        row(
+            "p-date-only",
+            Name=rich("Date only"),
+            **{"Start Time": when("2026-10-21"), "End Time": when(start), "MinuteSpent": 5},
+        ),
+    ]
+
+
+BROKEN_EXPECTED: dict[str, list[str]] = {
+    "p-ok": [],
+    "p-blank-name": [],
+    "p-no-end": ["missing_time"],
+    "p-no-start": ["missing_time"],
+    "p-reversed": ["invalid_range"],
+    "p-mismatch": ["duration_mismatch"],
+    "p-date-only": ["missing_time"],
+}
