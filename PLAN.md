@@ -427,11 +427,17 @@ The user chooses which kind they are pasting:
 
 ## 13. Windows packaging
 
-- **Build:** PyInstaller in one-folder mode, which starts faster than one-file builds.
-- **Installer:** Inno Setup creates `Setup.exe` with Start Menu and desktop shortcuts and an uninstaller. It checks for the WebView2 runtime and installs it if missing.
+- **Build:** PyInstaller in one-folder mode, which starts faster than one-file builds (`packaging/habit_tracker.spec`). It is a windowed app with the app icon and Windows version details, and bundles `ui/dist`, the SQL migrations and the package's version metadata. `packaging/build.ps1` builds the UI, then the app, then the installer. Every build must pass `--self-check` from the built `.exe`.
+- **Version:** one source, `version` in `pyproject.toml`. The app, the installer and the release read it from there, and the release workflow refuses a tag that doesn't match. `v0.1.0` is the first test release; `v1.0.0` is reserved for the first public release.
+- **Installer:** Inno Setup creates `Setup.exe` with a Start Menu shortcut, a desktop shortcut (a checkbox, on by default) and an uninstaller.
+  - **Per user:** it installs to `%LOCALAPPDATA%\Programs\Habit Tracker` without administrator rights.
+  - **Upgrades:** installing a newer version over an older one upgrades in place and closes the running app first.
+  - **WebView2:** it checks for the runtime (per machine and per user) and runs Microsoft's Evergreen bootstrapper, bundled in `Setup.exe`, if it is missing. The bootstrapper may ask for administrator rights. A failed, cancelled or offline bootstrapper is explained, and the app's own startup check covers WebView2 being removed later (10).
+- **Uninstall:** by default it removes only the program, keeping `%APPDATA%\HabitTracker\` and the Notion sign-in in Windows Credential Manager, so a reinstall picks up where it left off. An option, **unchecked by default**, also deletes both: the app first disconnects (for Notion sign-in it cancels the access with Notion, as Disconnect does, 12.7), then the uninstaller deletes the folder. If the access couldn't be cancelled, or the token was pasted, the uninstaller says how to remove it in Notion.
 - **Data:** stays in `%APPDATA%\HabitTracker\` across reinstalls.
-- **Code signing:** not used at first, so testers will see a SmartScreen warning. It can be added later as a separate build step.
-- **Distribution:** a GitHub Actions workflow builds `Setup.exe` whenever a version tag (`vX.Y.Z`) is pushed and attaches it to a GitHub Release. Other users download the app from the Releases page.
+- **Code signing:** not used at first, so testers will see a SmartScreen warning, and antivirus programs may flag the unsigned app (PyInstaller builds are a common false positive). The README explains what to do. Code signing would reduce both; it can be added later as a separate build step.
+- **Distribution:** a GitHub Actions workflow builds `Setup.exe` whenever a version tag (`vX.Y.Z`) is pushed and attaches it, with its SHA-256 checksum, to a GitHub Release. The Release notes are that version's entry in `CHANGELOG.md`. Other users download the app from the Releases page.
+- **Updates:** the app doesn't check for new versions. An in-app check would contact GitHub, which needs a privacy-policy change, and can't work while the repository is private. How users learn about new versions is an Open item for the public release (16).
 - **Privacy policy change notices** (a promise in the privacy policy):
   - **When:** if a change affects how data is handled, it ships only in a new app version, and that version shows a notice the first time it opens, before it does anything differently.
   - **How the app knows:** each build bundles a policy version number and a plain-language summary of the change. The app compares that number with the `acknowledged_policy_version` setting (11) and shows the notice when the bundled one is newer. Acknowledging the notice saves the new number.
@@ -444,7 +450,8 @@ The user chooses which kind they are pasting:
 habit-tracker/
 ├── PLAN.md
 ├── CLAUDE.md
-├── README.md
+├── README.md              # for users: install, connect, data, uninstall, antivirus, privacy
+├── CHANGELOG.md           # one entry per release; each Release's notes
 ├── .gitignore
 ├── .gitattributes
 ├── .editorconfig
@@ -458,7 +465,7 @@ habit-tracker/
 │   ├── ISSUE_TEMPLATE/      # bug report, feature request
 │   ├── pull_request_template.md
 │   ├── dependabot.yml       # uv, npm, GitHub Actions
-│   └── workflows/           # ci.yml (Phase 2), release (Phase 8)
+│   └── workflows/           # ci.yml (Phase 2), release.yml (Phase 8: a vX.Y.Z tag builds Setup.exe)
 ├── docs/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
 │   ├── extension-notes.md   # Phase 1 output
@@ -492,7 +499,7 @@ habit-tracker/
 │   ├── src/                 # bridge/, errors/, components/, tests next to the code
 │   └── plugins/             # Vite plugins (Content-Security-Policy)
 ├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui); tests/support has the fake Notion, in-memory keyring, hand-off vectors and screenshots
-└── packaging/               # PyInstaller spec, Inno Setup script
+└── packaging/               # PyInstaller spec, Inno Setup script, build.ps1, app icon
 ```
 
 ## 15. Build phases
@@ -509,7 +516,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 5. Sync | Implement full sync, quick sync (cursor on Notion's clock; a full sync on launch when the last is over 24 hours old), the mass-removal safeguard, validation, progress events, retries, every parent-task link, and Home's "Last sync" panel with the flagged entries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, the overlap rule, the day detail panel, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
 | 7. Raw logs | Build the table with filters (including issue types, overlaps and every extra field), red issue cells, hover explanations, overlap markers, select-then-open Notion links, remembered sort, widths and hidden columns, and CSV export through the native Save dialog. Write tests for the filters, sorting, export and the overlap agreement with the dashboard. | Every filter works, and flagged entries show the correct explanations. |
-| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
+| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine (Windows Sandbox). A Windows Defender scan of the installed app is clean, or any detection is handled. Both uninstall paths behave correctly: the default keeps the data folder and the Notion sign-in, and the option deletes both. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
 
 ### 15.1 Phase 0 checklist: project setup
 
@@ -586,6 +593,8 @@ Phase 0 is the only phase committed directly to `main`.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Notion review for other workspaces: sign-in without review is verified live only in the author's own workspace (2026-10-20). Phase 3 check (d) (a second Notion account) was accepted by the user's decision without being verified (2026-10-22). If another workspace's sign-in is ever blocked pending review, find out what Notion's review requires, record it here and in the Decisions log, and submit the connection.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
+- How users learn about new versions: to settle before the public release. The app has no update check (13). An in-app check would contact GitHub, so it needs a privacy-policy change, and it can't work while the repository is private.
+- Code signing: not used (13). It would reduce SmartScreen warnings and antivirus false positives; to decide before the public release.
 
 ## 17. Decisions log
 
@@ -673,5 +682,12 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-22 | Phase 7: opening Notion is a deliberate action. A single click on a row only selects it. Each row has an "Open in Notion" icon button at its end, and double-clicking or pressing Enter on the selected row also opens it. The parent task link and the "+N" list still open their pages. Cell text can be selected and copied. This replaces "clicking a row opens the entry in Notion" (8). |
 | 2026-10-22 | Phase 7: overlaps in the raw log. A row whose session overlaps another counted session gets an informational (not red) marker with the overlapped minutes, and there is an "Overlaps another session" filter. It reuses the dashboard's overlap function and its counted sessions (`app/stats/`), shared rather than reimplemented, and a test proves the raw log and the day detail agree (8). |
 | 2026-10-22 | Phase 7: CSV export of exactly the rows, columns, order and sorting on screen, through a native Windows Save dialog run from Python. UTF-8 with a BOM; local times with the time zone in the header; every state handled (nothing to export, cancelled, write error such as the file being open in Excel, success with the path). Also decided: text starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'` so a spreadsheet never runs it as a formula; the file is written to a temporary file and moved into place; "Show in folder" opens Explorer at the saved file (8). |
+| 2026-10-22 | Phase 8 plan approved. **Install scope:** per user, in `%LOCALAPPDATA%\Programs\Habit Tracker`, with no administrator rights (Microsoft's WebView2 bootstrapper may still ask for them on a PC without WebView2). **Version:** one source, `pyproject.toml`; the release workflow refuses a tag that doesn't match it. `v0.1.0` is the test release, and `v1.0.0` is reserved for the first public release, after the license is chosen. Each Release carries `Setup.exe` and its SHA-256 checksum (13). |
+| 2026-10-22 | Phase 8 clean-machine test: **Windows Sandbox**. The dev PC runs Windows 10 Pro (build 21996) with 8 GB of RAM and a hypervisor already active, so Sandbox is supported. A VirtualBox VM with Microsoft's evaluation image was ruled out because the PC has about 16 GB of free disk, less than the image needs. The repository is private, so `Setup.exe` is downloaded from the Release on the dev PC and copied into the Sandbox. The check includes a Windows Defender scan of the installed app (15). |
+| 2026-10-22 | Phase 8 app icon: an original design, nothing resembling Notion's logo. Claude Code offers 2–3 options as SVG previews; the user picks one, which becomes a multi-size `.ico` for the app, the installer and the shortcuts. |
+| 2026-10-22 | Phase 8 uninstall: the uninstaller offers an option, **unchecked by default**, to also delete `%APPDATA%\HabitTracker` and the Notion sign-in in Windows Credential Manager. The default keeps both. Deleting the sign-in disconnects first, as Disconnect does (12.7): for Notion sign-in the access is cancelled with Notion through the token service, which the privacy policy already lists ("when you disconnect"); if that fails, or the token was pasted, the uninstaller says how to remove access in Notion. The privacy policy's "Your choices" section is checked against what is built, and wording changes are reviewed by the user before the service is redeployed. Both uninstall paths are tested (13, 15). |
+| 2026-10-22 | Phase 8 antivirus: the clean-machine check scans the installed app with Windows Defender. The README explains what to do if an antivirus program flags the app. Code signing would reduce such false positives and SmartScreen warnings; it stays undecided until the public release (13, 16). |
+| 2026-10-22 | Phase 8 updates: `CHANGELOG.md` with a `v0.1.0` entry, and each GitHub Release's notes are that version's changelog entry. No in-app update check is built: it would contact GitHub, which needs a privacy-policy change, and it can't work while the repository is private. "How users learn about new versions" is an Open item for the public release (13, 16). |
+| 2026-10-22 | Phase 8 "Done when" extended: the Windows Defender scan of the installed app is clean (or any detection is handled), and both uninstall paths behave correctly (15). |
 | 2026-10-24 | Issue #11: a `HABIT_TRACKER_HOME` copy stores its sign-in under its own service, `HabitTracker-<hash>`, instead of the account `notion-<hash>` of the real service. keyring's Windows backend names an entry after the service alone, so the old scheme put a copy's sign-in on the real `HabitTracker` target and moved the real entry to `notion@HabitTracker`. A copy moves an entry saved under the old scheme the first time it reads it, and deletes it on logout. The real app's entry is unchanged and still read wherever keyring moved it (12.5). |
 | 2026-10-24 | Issue #12: Notion leaves a relation out of the schema while its linked database isn't shared with the connection, so "Parent Task" couldn't be mapped. The mapping screen now explains how to share the linked database, with Check again; a column that appears after the mapping was saved and fits an unused optional field is offered on Home and in Settings (Review column mapping or Dismiss), and preselected as "New column" on the mapping screen. The mapping records `known_columns` and the sync stores `mapping_suggestions` (4.2, 11). The day detail now also opens each session's parent task and other linked pages (7). |
