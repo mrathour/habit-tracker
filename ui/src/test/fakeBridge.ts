@@ -8,8 +8,11 @@ import type {
   ConnectionInfo,
   DataSourcePage,
   ErrorCode,
+  FlaggedPage,
   MappingReview,
   PythonApi,
+  SyncResult,
+  SyncStatus,
 } from "../bridge/types";
 import fixtures from "./mappingFixtures.json";
 
@@ -97,6 +100,71 @@ export const twoDatabases: DataSourcePage = {
   sharing_help_url: "https://habit-tracker.mrathour.workers.dev/support",
 };
 
+export const neverSynced: SyncStatus = {
+  running: null,
+  last_result: null,
+  last_successful_sync: null,
+  last_full_sync: null,
+  entries: 0,
+  flagged: 0,
+  pending_removal: null,
+  full_sync_required: false,
+};
+
+export const fullSyncDone: SyncResult = {
+  kind: "full",
+  reason: "First sync of this work log.",
+  finished_at: "2026-10-22T10:00:00.000Z",
+  ok: true,
+  added: 7,
+  updated: 0,
+  removed: 0,
+  flagged: 5,
+  skipped: 0,
+  warnings: [],
+  pending_removal: null,
+  error: null,
+};
+
+export const synced: SyncStatus = {
+  ...neverSynced,
+  last_result: fullSyncDone,
+  last_successful_sync: "2026-10-22T10:00:00.000Z",
+  last_full_sync: "2026-10-22T10:00:00.000Z",
+  entries: 7,
+  flagged: 5,
+};
+
+export const flaggedPage: FlaggedPage = {
+  total: 2,
+  entries: [
+    {
+      page_id: "p-mismatch",
+      display_id: "9",
+      task_name: "Mismatch",
+      start_utc: "2026-10-21T03:30:00.000Z",
+      end_utc: "2026-10-21T05:33:00.000Z",
+      issues: [
+        {
+          field: "logged_minutes",
+          code: "duration_mismatch",
+          message: "Logged 148 min, but Start → End is 123 min.",
+        },
+      ],
+      url: "https://www.notion.so/pmismatch",
+    },
+    {
+      page_id: "p-no-start",
+      display_id: null,
+      task_name: null,
+      start_utc: null,
+      end_utc: "2026-10-21T03:30:00.000Z",
+      issues: [{ field: "start", code: "missing_time", message: "Start time is empty." }],
+      url: "https://www.notion.so/pnostart",
+    },
+  ],
+};
+
 export function failWith(
   code: ErrorCode,
   message: string,
@@ -142,6 +210,12 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
     save_mapping: vi.fn<PythonApi["save_mapping"]>(() =>
       ok({ changed: false, full_sync_required: null }),
     ),
+    get_sync_status: vi.fn<PythonApi["get_sync_status"]>(() => ok(neverSynced)),
+    start_sync: vi.fn<PythonApi["start_sync"]>(() => ok(neverSynced)),
+    get_flagged_entries: vi.fn<PythonApi["get_flagged_entries"]>(() =>
+      ok({ entries: [], total: 0 }),
+    ),
+    resolve_pending_removal: vi.fn<PythonApi["resolve_pending_removal"]>(() => ok(synced)),
     open_external: vi.fn(() => ok(null)),
   };
   // Overrides replace the default behaviour but stay spies, so tests can assert on calls

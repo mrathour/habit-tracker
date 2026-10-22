@@ -49,7 +49,7 @@ def run_harness(tmp_path: Path, scenario: str, *flags: str) -> tuple[dict[str, A
 def check_ui_results(results: dict[str, Any], log: str) -> None:
     # The UI called a Python method and showed its result.
     assert "Python\n3.12" in results["facts"]
-    assert "schema version 1" in results["facts"]
+    assert "schema version 2" in results["facts"]
 
     # Python pushed progress events from a background thread, all received in order.
     events = results["events"]
@@ -201,4 +201,47 @@ def test_column_mapping(tmp_path: Path) -> None:
     assert "Mapping saved: a full sync is needed" in results["changed_home"]
     assert "Full sync required" in results["settings"]
     assert "Saved the column mapping (changed; full sync required)" in log
+    assert "ntn_" not in log
+
+
+@pytest.mark.skipif(not (ui_dist_dir() / "index.html").is_file(), reason="UI not built")
+def test_sync_across_launches(tmp_path: Path) -> None:
+    import sqlite3
+
+    # First launch: connect, map, and the first (full) sync copies everything.
+    first, log = run_harness(tmp_path, "sync-first")
+    panel = first["first"]["panel"]
+    assert "Full sync" in panel
+    assert "10 added · 0 updated · 0 removed" in panel
+    assert "First sync of this work log." in panel
+    flagged = "\n".join(first["first"]["flagged"])
+    assert "Logged 148 min, but Start → End is 123 min." in flagged
+    assert "End time is 7 min before Start time." in flagged
+    assert "End time is empty." in flagged
+    assert "Start time is empty." in flagged
+    assert "Start time has a date (2026-10-21) but no time." in flagged
+    assert len(first["first"]["flagged"]) == 5
+    assert "Full sync finished: 10 added, 0 updated, 0 removed, 5 flagged" in log
+
+    # Second launch, after edits and a deletion in Notion: a quick sync picks up the edits...
+    second, log = run_harness(tmp_path, "sync-relaunch")
+    relaunch = second["relaunch"]
+    assert "Quick sync" in relaunch["panel"]
+    assert "0 added · 2 updated · 0 removed" in relaunch["panel"]
+    assert any("Mismatch, renamed" in item for item in relaunch["flagged"])
+    assert not any("End time is empty." in item for item in relaunch["flagged"])
+    assert len(relaunch["flagged"]) == 4
+    # ... and only the full sync removes the deleted entry.
+    assert "1 removed" in second["full"]["panel"]
+    assert "You asked for a full sync." in second["full"]["panel"]
+
+    db = sqlite3.connect(tmp_path / "home" / "habit_tracker.db")
+    try:
+        ids = {row[0] for row in db.execute("SELECT page_id FROM work_logs")}
+        names = dict(db.execute("SELECT page_id, task_name FROM work_logs").fetchall())
+    finally:
+        db.close()
+    assert len(ids) == 9
+    assert "p-ok" not in ids
+    assert names["p-mismatch"] == "Mismatch, renamed"
     assert "ntn_" not in log

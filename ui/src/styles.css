@@ -1162,3 +1162,153 @@ a {
   display: grid;
   gap: 4px;
 }
+
+/* --- Sync (SyncIndicator, SyncPanel) ---------------------------------------------------- */
+
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.sync-indicator.full {
+  color: var(--ink);
+}
+
+.sync-indicator.full .progress {
+  width: 72px;
+}
+
+.sync-indicator.warn {
+  color: var(--amber);
+}
+
+.sync-indicator.error {
+  color: var(--red);
+}
+
+.dot.ok {
+  color: var(--green);
+}
+
+.spinner.small {
+  width: 11px;
+  height: 11px;
+}
+
+.progress.indeterminate {
+  position: relative;
+}
+
+.progress.indeterminate::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: inherit;
+  background: var(--green);
+  animation: sweep 1.3s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress.indeterminate::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.sync-running,
+.sync-done {
+  display: grid;
+  gap: 6px;
+}
+
+.sync-running p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.sync-done p {
+  margin: 0;
+}
+
+.removal .issue-list {
+  margin-bottom: 4px;
+}
+
+.flagged {
+  display: grid;
+  gap: 10px;
+}
+
+.flagged h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.flagged-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.flagged-list > li + li {
+  border-top: 1px solid var(--rule);
+}
+
+.flagged-entry {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--red);
+}
+
+.flagged-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.flagged-name {
+  font-weight: 600;
+}
+
+.flagged-head .link-button {
+  margin-left: auto;
+}
+
+.issue {
+  font-size: 13px;
+  color: var(--red);
+}
