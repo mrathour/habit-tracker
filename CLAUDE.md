@@ -36,9 +36,17 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 - **Data:** validation is in `app/validation/checks.py`, and issues are stored per entry. Every parent-task link is kept (`parent_task_ids`, migration 0002). `last_sync_result` drives Home's "Last sync" panel (`ui/src/sync/`).
 - **For Phase 6:** the charts leave out entries with `missing_time` or `invalid_range` issues. Durations always come from `end_utc` − `start_utc`. Hold `app.db.connection.lock_for(conn)` for any query on the shared connection.
 
-**Current: Phase 6: Dashboard**, on the branch `phase-6-dashboard`. Scope and "Done when" are in `PLAN.md` section 15, with the dashboard rules in section 7. Work has not started yet: give the user a short build plan and wait for their OK.
+**Phase 6: Dashboard** is complete and approved (2026-10-22, PR #8).
+- **Stats:** `app/stats/` computes local days from the IANA time zone the UI sends. The overlap rule (`overlap_rule`: `once` or `sum`) applies first, then the midnight rule (`split` or `start_date`). It produces daily totals, weekly totals with a 4-week average, streaks (threshold, today's grace) and the calendar, plus a day detail.
+- **UI:** `ui/src/dashboard/` draws the charts with modular ECharts. In Vitest, ECharts is replaced by `ui/src/test/echartMock.tsx`, and the real charts are checked by `pytest -m gui`. Settings → Dashboard holds the four preferences.
+- **For Phase 7:**
+  - Point the dashboard's flagged count, which now scrolls to `#flagged-title` on Home, at the raw log's "Has issues" filter.
+  - Show parent-task links as the first link plus a "+N" chip, filtering on any of them (`PLAN.md` section 8).
+  - Issues are stored per entry as `[{field, code, message}]`. `invalid_range` colours both the Start and End cells.
 
-**Next: Phase 7: Raw logs** (see `PLAN.md` section 15).
+**Current: Phase 7: Raw logs**, on the branch `phase-7-raw-logs`. Scope and "Done when" are in `PLAN.md` section 15, with the raw log rules in section 8 and the issue rules in section 5. Work has not started yet: give the user a short build plan and wait for their OK.
+
+**Next: Phase 8: Package** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
