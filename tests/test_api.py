@@ -36,6 +36,10 @@ PUBLIC_METHODS = {
     "start_sync",
     "get_flagged_entries",
     "resolve_pending_removal",
+    "get_dashboard",
+    "get_day_detail",
+    "get_preferences",
+    "set_preferences",
     "open_external",
 }
 
