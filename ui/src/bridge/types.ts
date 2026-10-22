@@ -26,7 +26,9 @@ export type ErrorCode =
   | "source_unavailable"
   | "mapping_invalid"
   | "not_ready"
-  | "schema_blocked";
+  | "schema_blocked"
+  | "invalid_request"
+  | "invalid_preference";
 
 export type AuthKind = "oauth" | "internal" | "pat";
 export type PastedKind = "internal" | "pat";
@@ -224,6 +226,104 @@ export interface FlaggedPage {
   total: number;
 }
 
+// --- Dashboard (app/stats/) --------------------------------------------------------------
+
+export type Weekday =
+  "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+
+export interface Preferences {
+  /** 0 means any time at all; otherwise a streak day needs at least this many minutes. */
+  streak_threshold_minutes: number;
+  week_start: Weekday;
+  midnight_rule: "split" | "start_date";
+  overlap_rule: "once" | "sum";
+}
+
+export type DailyRange = { days: 7 | 30 | 90 } | { from: string; to: string };
+
+export interface DashboardRequest {
+  time_zone: string;
+  range: DailyRange;
+  weeks: 12 | 26 | 52;
+  /** null for the last 12 months. */
+  year: number | null;
+}
+
+export interface DayTotal {
+  date: string;
+  minutes: number;
+  sessions: number;
+}
+
+export interface WeekTotal {
+  start: string;
+  end: string;
+  minutes: number;
+  rolling_average: number | null;
+  partial: boolean;
+}
+
+export interface Streak {
+  days: number;
+  start: string;
+  end: string;
+}
+
+export interface Dashboard {
+  time_zone: string;
+  today: string;
+  preferences: Preferences;
+  entries: number;
+  counted_sessions: number;
+  excluded: number;
+  flagged: number;
+  daily: {
+    first: string;
+    last: string;
+    days: DayTotal[];
+    total_minutes: number;
+    active_days: number;
+  };
+  weekly: WeekTotal[];
+  streaks: {
+    current: Streak | null;
+    longest: Streak | null;
+    today_counts: boolean;
+    threshold_minutes: number;
+  };
+  calendar: {
+    first: string;
+    last: string;
+    year: number | null;
+    days: DayTotal[];
+    total_minutes: number;
+    max_minutes: number;
+    years: number[];
+  };
+}
+
+export interface DetailSession {
+  page_id: string;
+  display_id: string | null;
+  task_name: string | null;
+  start_utc: string;
+  end_utc: string;
+  minutes: number;
+  counted_minutes: number;
+  crosses_midnight: boolean;
+  overlap_minutes: number;
+  overlaps_with: { page_id: string; label: string }[];
+  url: string;
+}
+
+export interface DayDetail {
+  date: string;
+  time_zone: string;
+  minutes: number;
+  preferences: Preferences;
+  sessions: DetailSession[];
+}
+
 export interface DataSourceChoice {
   id: string;
   name: string;
@@ -320,6 +420,10 @@ export interface PythonApi {
   start_sync(kind: SyncRequest): Promise<BridgeResponse<SyncStatus>>;
   get_flagged_entries(offset: number, limit: number): Promise<BridgeResponse<FlaggedPage>>;
   resolve_pending_removal(remove: boolean): Promise<BridgeResponse<SyncStatus>>;
+  get_dashboard(request: DashboardRequest): Promise<BridgeResponse<Dashboard>>;
+  get_day_detail(timeZone: string, day: string): Promise<BridgeResponse<DayDetail>>;
+  get_preferences(): Promise<BridgeResponse<Preferences>>;
+  set_preferences(changes: Partial<Preferences>): Promise<BridgeResponse<Preferences>>;
   open_external(url: string): Promise<BridgeResponse<null>>;
 }
 

@@ -1,9 +1,10 @@
 import type { ConnectionInfo } from "../bridge/types";
 import { WorkspaceBadge } from "../components/WorkspaceBadge";
+import { DashboardSection } from "../dashboard/DashboardView";
 import { SyncPanel } from "../sync/SyncPanel";
 import type { SyncState } from "../sync/useSync";
 
-/** Connected and a work log chosen. The charts arrive with syncing (PLAN.md phases 5–6). */
+/** Connected, a work log chosen and mapped: the dashboard, then the last sync (PLAN.md 6, 7). */
 export function HomeView({
   info,
   sync,
@@ -27,7 +28,7 @@ export function HomeView({
       : Boolean(info.full_sync_required);
 
   return (
-    <section className="column" aria-labelledby="home-title">
+    <section className="column" aria-labelledby="home-title" data-width="dashboard">
       <h1 id="home-title" className="section-title">
         {info.database_title ?? "Your work log"}
       </h1>
@@ -44,13 +45,18 @@ export function HomeView({
           <p>{info.full_sync_required.reason} It runs with the next sync.</p>
         </div>
       )}
+      <DashboardSection sync={sync.load.status === "ready" ? sync.load.sync : null} />
+      <SyncPanel
+        info={info}
+        state={sync}
+        onOpenMapping={onReviewMapping}
+        onPasteNewToken={onPasteNewToken}
+      />
       <div className="panel">
         <WorkspaceBadge info={info} />
         <p>
           Habit Tracker is connected and reads{" "}
-          <strong>{info.database_title ?? "your work log"}</strong>. Your daily totals, weekly
-          trends and streaks arrive here in the next version; for now, this page shows what each
-          sync copied and which entries need a look.
+          <strong>{info.database_title ?? "your work log"}</strong>.
         </p>
         <div className="actions">
           <button type="button" className="button" onClick={onReviewMapping}>
@@ -61,12 +67,6 @@ export function HomeView({
           </button>
         </div>
       </div>
-      <SyncPanel
-        info={info}
-        state={sync}
-        onOpenMapping={onReviewMapping}
-        onPasteNewToken={onPasteNewToken}
-      />
     </section>
   );
 }

@@ -6,7 +6,10 @@ import type {
   BackendEvent,
   BridgeResponse,
   ConnectionInfo,
+  Dashboard,
   DataSourcePage,
+  DayDetail,
+  DayTotal,
   ErrorCode,
   FlaggedPage,
   MappingReview,
@@ -165,6 +168,143 @@ export const flaggedPage: FlaggedPage = {
   ],
 };
 
+export const defaultPreferences = {
+  streak_threshold_minutes: 0,
+  week_start: "monday",
+  midnight_rule: "split",
+  overlap_rule: "once",
+} as const;
+
+function dayRange(last: string, count: number, minutes: (index: number) => number): DayTotal[] {
+  const end = Date.parse(`${last}T00:00:00Z`);
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date(end - (count - 1 - i) * 86_400_000).toISOString().slice(0, 10);
+    const value = minutes(i);
+    return { date, minutes: value, sessions: value > 0 ? 1 : 0 };
+  });
+}
+
+/** Nothing copied yet: the dashboard's empty state. */
+export const emptyDashboard: Dashboard = {
+  time_zone: "Asia/Kolkata",
+  today: "2026-10-22",
+  preferences: defaultPreferences,
+  entries: 0,
+  counted_sessions: 0,
+  excluded: 0,
+  flagged: 0,
+  daily: {
+    first: "2026-09-23",
+    last: "2026-10-22",
+    days: dayRange("2026-10-22", 30, () => 0),
+    total_minutes: 0,
+    active_days: 0,
+  },
+  weekly: [],
+  streaks: { current: null, longest: null, today_counts: false, threshold_minutes: 0 },
+  calendar: {
+    first: "2025-10-23",
+    last: "2026-10-22",
+    year: null,
+    days: [],
+    total_minutes: 0,
+    max_minutes: 0,
+    years: [],
+  },
+};
+
+const thirtyDays = dayRange("2026-10-22", 30, (i) => (i >= 27 ? 60 + i : i % 3 === 0 ? 45 : 0));
+
+/** A work log with a few weeks of sessions. */
+export const dashboard: Dashboard = {
+  ...emptyDashboard,
+  entries: 12,
+  counted_sessions: 10,
+  excluded: 2,
+  flagged: 3,
+  daily: {
+    first: "2026-09-23",
+    last: "2026-10-22",
+    days: thirtyDays,
+    total_minutes: thirtyDays.reduce((sum, d) => sum + d.minutes, 0),
+    active_days: thirtyDays.filter((d) => d.minutes > 0).length,
+  },
+  weekly: [
+    { start: "2026-10-05", end: "2026-10-11", minutes: 90, rolling_average: 90, partial: false },
+    {
+      start: "2026-10-12",
+      end: "2026-10-18",
+      minutes: 135,
+      rolling_average: 112.5,
+      partial: false,
+    },
+    { start: "2026-10-19", end: "2026-10-25", minutes: 240, rolling_average: 155, partial: true },
+  ],
+  streaks: {
+    current: { days: 3, start: "2026-10-20", end: "2026-10-22" },
+    longest: { days: 3, start: "2026-10-20", end: "2026-10-22" },
+    today_counts: true,
+    threshold_minutes: 0,
+  },
+  calendar: {
+    first: "2025-10-23",
+    last: "2026-10-22",
+    year: null,
+    days: dayRange("2026-10-22", 365, (i) => (i >= 335 ? (thirtyDays[i - 335]?.minutes ?? 0) : 0)),
+    total_minutes: thirtyDays.reduce((sum, d) => sum + d.minutes, 0),
+    max_minutes: 89,
+    years: [2026, 2025],
+  },
+};
+
+export const dayDetail: DayDetail = {
+  date: "2026-10-21",
+  time_zone: "Asia/Kolkata",
+  minutes: 120,
+  preferences: defaultPreferences,
+  sessions: [
+    {
+      page_id: "p1",
+      display_id: "1",
+      task_name: "Write",
+      start_utc: "2026-10-21T03:30:00.000Z",
+      end_utc: "2026-10-21T05:00:00.000Z",
+      minutes: 90,
+      counted_minutes: 90,
+      crosses_midnight: false,
+      overlap_minutes: 30,
+      overlaps_with: [{ page_id: "p2", label: "#2 Review" }],
+      url: "https://www.notion.so/p1",
+    },
+    {
+      page_id: "p2",
+      display_id: "2",
+      task_name: null,
+      start_utc: "2026-10-21T04:30:00.000Z",
+      end_utc: "2026-10-21T05:30:00.000Z",
+      minutes: 60,
+      counted_minutes: 30,
+      crosses_midnight: false,
+      overlap_minutes: 30,
+      overlaps_with: [{ page_id: "p1", label: "#1 Write" }],
+      url: "https://www.notion.so/p2",
+    },
+    {
+      page_id: "p3",
+      display_id: "3",
+      task_name: "Late",
+      start_utc: "2026-10-21T17:30:00.000Z",
+      end_utc: "2026-10-21T19:30:00.000Z",
+      minutes: 120,
+      counted_minutes: 60,
+      crosses_midnight: true,
+      overlap_minutes: 0,
+      overlaps_with: [],
+      url: "https://www.notion.so/p3",
+    },
+  ],
+};
+
 export function failWith(
   code: ErrorCode,
   message: string,
@@ -216,6 +356,12 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
       ok({ entries: [], total: 0 }),
     ),
     resolve_pending_removal: vi.fn<PythonApi["resolve_pending_removal"]>(() => ok(synced)),
+    get_dashboard: vi.fn<PythonApi["get_dashboard"]>(() => ok(emptyDashboard)),
+    get_day_detail: vi.fn<PythonApi["get_day_detail"]>(() => ok(dayDetail)),
+    get_preferences: vi.fn<PythonApi["get_preferences"]>(() => ok(defaultPreferences)),
+    set_preferences: vi.fn<PythonApi["set_preferences"]>((changes) =>
+      ok({ ...defaultPreferences, ...changes }),
+    ),
     open_external: vi.fn(() => ok(null)),
   };
   // Overrides replace the default behaviour but stay spies, so tests can assert on calls

@@ -10,6 +10,7 @@ import { WorkspaceBadge } from "../components/WorkspaceBadge";
 import { authKindLabel, connectionLabel, disconnectSummary } from "../connection/labels";
 import { TokenForm } from "../connection/TokenForm";
 import { noticeFromCallError } from "../errors/reporting";
+import { DashboardSettings } from "../dashboard/DashboardSettings";
 import { formatWhen } from "../sync/format";
 import type { SyncState } from "../sync/useSync";
 import { DisconnectDialog } from "./DisconnectDialog";
@@ -145,6 +146,8 @@ export function SettingsView({
           {sync.startProblem && <p className="field-error">{sync.startProblem.message}</p>}
         </section>
       )}
+
+      {sync && <DashboardSettings />}
 
       <section className="panel" aria-labelledby="settings-advanced">
         <h2 id="settings-advanced" tabIndex={focusAdvanced ? -1 : undefined}>
