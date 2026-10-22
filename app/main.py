@@ -41,7 +41,7 @@ from app.notion.credentials import CredentialStore
 from app.notion.service_client import DEFAULT_SERVICE_URL, SERVICE_URL_ENV_VAR, TokenServiceClient
 from app.notion.tokens import TokenManager
 from app.paths import AppPaths, resource_root, ui_dist_dir
-from app.policy import PolicyService
+from app.policy import PolicyService, load_policy
 from app.rawlog.service import RawLogService
 from app.single_instance import SingleInstance, bring_existing_window_to_front
 from app.stats.service import StatsService
@@ -154,12 +154,24 @@ def self_check(args: argparse.Namespace, paths: AppPaths, log_file: Path) -> int
             "schema_version": startup.database.schema_version if startup.database else None,
             "log_file": str(log_file),
             "ui_url": startup.url,
+            "frozen": bool(getattr(sys, "frozen", False)),
+            "policy_version": load_policy().version,
+            "credential_store": _keyring_backend(),
+            "webview2": check_runtime().webview2_version,
             "error": startup.error.to_dict() if startup.error else None,
         }
     finally:
         startup.close()
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
     return 0 if report["ok"] else 1
+
+
+def _keyring_backend() -> str:
+    """Which keyring backend is active: Windows Credential Manager in a working build."""
+    import keyring
+
+    backend = keyring.get_keyring()
+    return f"{type(backend).__module__}.{type(backend).__name__}"
 
 
 class UiReadyWatchdog:
