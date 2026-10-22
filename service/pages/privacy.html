@@ -1,0 +1,143 @@
+<h1>Privacy policy</h1>
+<p class="meta">Last updated: {{EFFECTIVE_DATE}}</p>
+
+<p class="lead">
+  Short version: your Notion data stays on your computer. The Habit Tracker sign-in service passes
+  your access through without storing it, and nobody collects, sells or shares anything about you.
+</p>
+
+<h2>Who this policy is from</h2>
+<p>
+  Habit Tracker is made by {{OPERATOR_NAME}}. This policy covers the Habit Tracker desktop app and
+  this website, which is its sign-in service. You can reach me at
+  <a href="mailto:{{CONTACT_EMAIL}}">{{CONTACT_EMAIL}}</a>.
+</p>
+
+<h2>What the app reads from Notion</h2>
+<p>
+  The app only ever <strong>reads</strong> from Notion. It never creates, changes, comments on or
+  deletes anything in your workspace. What Notion allows it to reach depends on how you connect:
+</p>
+<ul>
+  <li>
+    <strong>Connect to Notion</strong> (the usual way): Notion gives the app read-only access to the
+    pages and databases you choose to share with it while connecting. Notion itself refuses any
+    attempt to change them.
+  </li>
+  <li>
+    <strong>Internal integration token</strong> (pasted in the app's advanced settings): the app can
+    reach only the pages and databases you share with that integration, with the capabilities you
+    gave it in Notion. Giving it <em>Read content</em> only is recommended.
+  </li>
+  <li>
+    <strong>Personal access token</strong> (pasted in the app's advanced settings): Notion gives the
+    app the same access as the person who created the token, to everything they can see, without any
+    sharing step. Notion doesn't limit these tokens to reading, but the app still sends only read
+    requests.
+  </li>
+</ul>
+<p>Whichever way you connect:</p>
+<ul>
+  <li>
+    To let you pick your work log, the app lists the names of the databases it can reach. After
+    that, it reads entries from the one database you picked and nothing else.
+  </li>
+  <li>
+    From that database it copies each entry's start and end times, its name, its link to a parent
+    task, its logged minutes, and any extra columns you choose to include. It also records the name
+    and icon of your workspace, so it can show which workspace is connected.
+  </li>
+</ul>
+
+<h2>Where your data is kept</h2>
+<ul>
+  <li>
+    <strong>On your computer only.</strong> The copy of your work log and the app's settings are
+    kept in a database file in your Windows user profile. They're never sent to me or to anyone
+    else.
+  </li>
+  <li>
+    Your Notion access is saved in <strong>Windows Credential Manager</strong> on your computer.
+    It's never written to a plain file, to the app's logs or to this website.
+  </li>
+  <li>
+    The app's log files, also on your computer, record what the app did (for example "synced 42
+    entries"). They never contain your Notion access.
+  </li>
+</ul>
+
+<h2>What this website does, and what it stores</h2>
+<p>The app uses this website only at three moments:</p>
+<ul>
+  <li>
+    <strong>When you connect.</strong> After you approve access in Notion, Notion sends a one-time
+    code here. This site exchanges it with Notion for your access, encrypts the result so that only
+    the copy of the app that started the connection can read it, and hands it straight back to that
+    app on your computer.
+  </li>
+  <li><strong>When the app renews its access,</strong> which Notion requires from time to time.</li>
+  <li><strong>When you disconnect,</strong> so Notion can cancel the app's access.</li>
+</ul>
+<p>
+  At each of these moments your access passes through this site in memory, for the length of that
+  one request, and is then gone. <strong>This site has no database and keeps no accounts.</strong>
+  It sets no cookies, runs no analytics or tracking, and shows no ads.
+</p>
+<p>
+  If you connect with a token you paste into the app's advanced settings instead, this website isn't
+  involved at all. The app talks to Notion directly.
+</p>
+
+<h2>Technical information</h2>
+<p>
+  This site runs on Cloudflare. Like any website, it necessarily sees your IP address and basic
+  request details while handling a request.
+</p>
+<ul>
+  <li>
+    Its own logs record only which page was requested, whether it worked, and how long it took. They
+    never record your access, Notion's codes, the contents of requests, or web addresses with their
+    parameters.
+  </li>
+  <li>
+    To protect the service from abuse, it counts requests per IP address over short periods, about a
+    minute. Those counts aren't kept beyond that.
+  </li>
+  <li>
+    Cloudflare handles this traffic under its own
+    <a href="https://www.cloudflare.com/privacypolicy/">privacy policy</a>.
+  </li>
+</ul>
+
+<h2>Sharing</h2>
+<p>
+  I don't sell, rent or share your information with anyone. The only parties involved are Notion,
+  which you connect to yourself, and Cloudflare, which runs this site.
+</p>
+
+<h2>Your choices</h2>
+<ul>
+  <li>
+    <strong>Disconnect</strong> in the app. It cancels the app's access with Notion and deletes it
+    from your computer, then asks whether to keep or delete the local copy of your work log.
+  </li>
+  <li>
+    <strong>Remove access in Notion</strong> at any time, under Settings → Connections. The app then
+    stops receiving data.
+  </li>
+  <li>
+    <strong>Uninstall the app</strong> and delete its folder, <code>%APPDATA%\HabitTracker</code>,
+    to remove everything it kept.
+  </li>
+</ul>
+
+<h2>Children</h2>
+<p>Habit Tracker isn't aimed at children under 13.</p>
+
+<h2>Changes</h2>
+<p>
+  If this policy changes, the new version will appear here with a new date. If a change affects how
+  your data is handled, it will only arrive in a new version of the app, and that version will tell
+  you about it the first time you open it, before it does anything differently. The app doesn't
+  check this website for changes.
+</p>

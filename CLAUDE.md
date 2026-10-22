@@ -18,18 +18,11 @@ This is a Windows desktop habit tracker. It reads the user's Notion **Work Log**
 
 **Phase 1: Explore the Chrome extension** is complete and approved (2026-10-18, PR #1). Its output is `docs/extension-notes.md` and the auth design in `PLAN.md` section 12.
 
-**Current: Phase 2: Scaffold**, on the branch `phase-2-scaffold`.
+**Phase 2: Scaffold** is complete and approved (2026-10-18, PR #2). It delivered the uv Python project, the React + TypeScript + Vite UI, the pywebview window and JS bridge (dev and normal modes), `%APPDATA%\HabitTracker\` paths, the SQLite schema with versioned migrations, redacting rotating logs, in-window error handling, and CI, pre-commit and Dependabot. There is no branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
 
-- Back end: Python 3.12 project managed with `uv`, using the `app/` layout in `PLAN.md` section 14, with ruff and pytest configured.
-- Front end: React + TypeScript (strict) + Vite in `ui/`, with ECharts and TanStack Table installed.
-- Desktop shell: a pywebview window with the JS bridge, in dev mode (Vite dev server, hot reload) and normal mode (built `ui/dist`). The UI calls a Python method and shows the result, and Python pushes events to the UI.
-- `%APPDATA%\HabitTracker\` paths (database, logs), created on first run.
-- The SQLite schema from `PLAN.md` section 11 with versioned migrations, tested on a new database and on re-runs.
-- Rotating logs that never contain tokens or secrets (tested), and readable in-window error messages instead of crashes or blank screens.
-- CI on `windows-latest` (ruff, pytest, TypeScript type check, UI build), pre-commit hooks and Dependabot. No branch protection (decided in the Phase 2 review): never merge without the user's explicit approval.
-- Fill in the Commands section below, record decisions in `PLAN.md`, open a pull request, and wait for the user's approval. **Do not start Phase 3.**
+**Current: Phase 3: Connect**, on the branch `phase-3-connect`. Scope and "Done when" are in `PLAN.md` section 15, with the auth design in section 12. Work has not started yet: wait for the user's Phase 3 instructions, then restate what you'll build and how it will be checked.
 
-**Next: Phase 3: Connect** (see `PLAN.md` section 15).
+**Next: Phase 4: Map** (see `PLAN.md` section 15).
 
 Update this section whenever a new phase begins.
 
@@ -70,6 +63,7 @@ PowerShell, from the repository root. The installer build arrives in Phase 8.
 ```powershell
 uv sync                       # Python 3.12 venv in .venv, from uv.lock
 npm --prefix ui ci            # UI packages, from ui/package-lock.json
+npm --prefix service ci       # token service packages (also needed for the OAuth window tests)
 uv run pre-commit install     # git hook: lint, format, type check, secret scan on commit
 ```
 
@@ -93,6 +87,7 @@ uv run pytest                 # back-end tests (excludes the window tests)
 uv run pytest -m gui          # end-to-end tests that open the real window; build the UI first
 uv run pytest --cov           # with coverage
 npm --prefix ui test          # UI tests (Vitest)
+npm --prefix service test     # token service tests (Vitest in the Workers runtime)
 ```
 
 **Lint, format and type check:**
@@ -104,8 +99,22 @@ uv run mypy
 npm --prefix ui run lint
 npm --prefix ui run format    # format:check to only report
 npm --prefix ui run typecheck
+npm --prefix service run lint
+npm --prefix service run typecheck
+npm --prefix service run types   # wrangler.toml and worker-configuration.d.ts agree
 uv run pre-commit run --all-files   # every hook, as CI runs them
 ```
+
+**Token service (`service/`, details in `docs/token-service.md`):**
+
+```powershell
+npm --prefix service run dev      # local Worker on http://127.0.0.1:8787 (copy service/.dev.vars.example to .dev.vars first)
+npm --prefix service run deploy   # checks page values and tests, then deploys to https://habit-tracker.mrathour.workers.dev
+```
+
+Secrets are set only by the user, in their own terminal, with `npx wrangler secret put`. Never ask for or handle their values.
+
+**Test overrides:** `HABIT_TRACKER_SERVICE_URL` and `HABIT_TRACKER_NOTION_URL` point the app at a local token service and a fake Notion (the end-to-end tests use them). `PYTHON_KEYRING_BACKEND` is never needed: tests force an in-memory keyring.
 
 **Build the UI:** `npm --prefix ui run build` type-checks, then writes the single-file bundle to `ui/dist/index.html`.
 

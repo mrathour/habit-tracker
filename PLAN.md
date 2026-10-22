@@ -209,7 +209,7 @@ Durations always come from End − Start. Entries excluded by validation do not 
 - **If the window itself can't open** (for example WebView2 is missing), a Windows message box explains.
 
 **Token service:** a Cloudflare Worker in TypeScript, under `service/`.
-- **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-pool-workers` for tests.
+- **Tools:** Wrangler for deploys, Vitest with `@cloudflare/vitest-plugin` for tests (the renamed `@cloudflare/vitest-pool-workers`), running inside the Workers runtime.
 - **Crypto:** WebCrypto for X25519, HKDF and AES-GCM. If the Workers runtime lacks X25519, use `@noble/curves`.
 - **Details:** see 12.2.
 
@@ -249,9 +249,10 @@ Indexes on `start_utc` and `parent_task_id`.
 
 **`settings`** is a key–value table (`key TEXT PRIMARY KEY, value TEXT` holding JSON). Its keys are:
 - **Notion source:** `database_id`, `data_source_id`, `database_title`;
-- **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`;
+- **Connection metadata:** `auth_kind` (`oauth`, `internal` or `pat`), `workspace_id`, `workspace_name`, `workspace_icon` (`{type: "emoji" | "image", value}`; images are stored as a data URI), `account_name` (the person behind a personal access token);
 - **Mapping:** `mapping` (app field → property ID, plus the list of extra fields);
 - **Preferences:** `streak_threshold_minutes`, `week_start`, `midnight_rule`;
+- **Policy:** `acknowledged_policy_version` (13);
 - **Sync bookkeeping:** `last_successful_sync`, `last_full_sync`.
 
 The local schema version is kept by the migration system (`schema_migrations` and `PRAGMA user_version`), not in `settings`.
@@ -285,12 +286,12 @@ The rest of the app doesn't care which path produced the token.
 ### 12.2 Token service (`service/`)
 
 - **What it is:** a stateless Cloudflare Worker written in TypeScript, in this repo under `service/`.
-  - **Tests:** its own tests (Vitest with `@cloudflare/vitest-pool-workers`).
+  - **Tests:** its own tests (Vitest with `@cloudflare/vitest-plugin`).
   - **Documentation:** `service/README.md` has the setup, configuration and deploy instructions (`wrangler deploy`).
   - **CI:** runs its tests.
 - **Secrets:** the client secret and the state-signing key exist **only as Cloudflare secrets** (`wrangler secret put`), never in the repo, CI logs or any file. The client ID is a plain Worker variable.
 - **Stores nothing:** no KV, D1 or other storage. Tokens exist only in memory for the length of one request.
-- **Logs no tokens:** logs hold only the route, status code and duration, never request or response bodies, query strings or auth headers.
+- **Logs no tokens:** logs hold only the route, method, status code and duration, never request or response bodies, query strings or auth headers. Cloudflare's automatic invocation logs are turned off (`invocation_logs = false`), because they record the full request URL, which on `/callback` holds Notion's one-time code and the `state`.
 - **Response headers:** `Cache-Control: no-store` and `Referrer-Policy: no-referrer` on every response.
 - **Rate limit:** requests are rate-limited per IP address with Cloudflare's rate-limiting binding.
 - **Routes:**
@@ -359,15 +360,22 @@ The user chooses which kind they are pasting:
 ### 12.6 Database picker
 
 - **Search:** the picker pages through `POST /v1/search` filtered to data sources (Notion API 2026-03-11).
-- **Display:** it shows each data source with its parent database's title.
-- **Saved:** `database_id` and `data_source_id` (11).
-- **Empty:** if nothing is found, the picker explains how to share the database with the connection and offers "Connect again".
+- **Display:** data sources are grouped under their parent database, whose title (and emoji icon) is fetched once per database. A database with several data sources shows them as choices once it is selected. "Show more databases" loads the next page of search results.
+- **Saved:** `database_id`, `data_source_id` and `database_title` (11), after checking with `GET /v1/data_sources/{id}` that the data source is readable and belongs to that database.
+- **Switching:** choosing a different data source while entries from the previous one are stored asks first. Confirming removes those entries and the old database's mapping and sync times; they stay in Notion. Choosing the same one again keeps everything.
+- **Empty:** if nothing is found, the picker explains how to share the database, with steps for the kind of connection: Add connections for Notion sign-in and internal tokens; for a personal access token, that the database must be visible to its owner. It offers "Refresh" and, for Notion sign-in, "Connect again and choose pages".
+- **Problems:** a 401 shows "Reconnect to Notion" (OAuth) or "Paste a new token" (pasted tokens). Offline and other errors offer "Try again".
 
 ### 12.7 Logout
 
-1. **Revoke:** for OAuth, the app calls `/revoke`. A failure doesn't block logout.
-2. **Delete:** it deletes the Credential Manager entry.
-3. **Ask:** it asks whether to keep or clear the local data, as before.
+1. **Ask first:** the Disconnect dialog asks whether to keep or delete the entries copied to this computer.
+2. **Revoke:** for OAuth, the app calls `/revoke`. A failure doesn't block logout; the app says Notion's access couldn't be cancelled and how to remove it in Notion. Pasted tokens can't be revoked by the app, so it explains where to revoke or delete them.
+3. **Delete:** it deletes the Credential Manager entry and the connection metadata (11).
+4. **Local data:**
+   - **Keep:** keeps the entries and the database choice, so reconnecting picks up where it left off.
+   - **Delete:** removes the entries, the database choice, the mapping and the sync times. Preferences stay.
+
+**Replacing a connection:** pasting a token while connected through Notion sign-in revokes the old OAuth access first. A failure there doesn't block the new connection.
 
 ## 13. Windows packaging
 
@@ -376,6 +384,11 @@ The user chooses which kind they are pasting:
 - **Data:** stays in `%APPDATA%\HabitTracker\` across reinstalls.
 - **Code signing:** not used at first, so testers will see a SmartScreen warning. It can be added later as a separate build step.
 - **Distribution:** a GitHub Actions workflow builds `Setup.exe` whenever a version tag (`vX.Y.Z`) is pushed and attaches it to a GitHub Release. Other users download the app from the Releases page.
+- **Privacy policy change notices** (a promise in the privacy policy):
+  - **When:** if a change affects how data is handled, it ships only in a new app version, and that version shows a notice the first time it opens, before it does anything differently.
+  - **How the app knows:** each build bundles a policy version number and a plain-language summary of the change. The app compares that number with the `acknowledged_policy_version` setting (11) and shows the notice when the bundled one is newer. Acknowledging the notice saves the new number.
+  - **Fresh installs:** they show no notice. The current version is saved when the user first connects, which is where the policy is linked.
+  - **No website contact:** the app never checks the website for policy changes, because the policy says it uses the website only when connecting, renewing and disconnecting.
 
 ## 14. Project layout
 
@@ -400,11 +413,14 @@ habit-tracker/
 │   └── workflows/           # ci.yml (Phase 2), release (Phase 8)
 ├── docs/
 │   ├── setup.md             # Phase 0 output: tools, versions, new-machine setup
-│   └── extension-notes.md   # Phase 1 output
+│   ├── extension-notes.md   # Phase 1 output
+│   ├── handoff-protocol.md  # Phase 3: signed state and encrypted hand-off, shared by app and service
+│   ├── token-service.md     # Phase 3: service setup, secrets, deploy
+│   └── notion-integration.md # Phase 3: the Notion public connection's settings
 ├── service/                 # Token service: Cloudflare Worker (TypeScript), Phase 3
 │   ├── src/                 # /start, /callback, /refresh, /revoke, /health, page routes
 │   ├── pages/               # home, privacy policy, terms, support (served by the Worker)
-│   ├── test/                # Vitest + @cloudflare/vitest-pool-workers
+│   ├── test/                # Vitest + @cloudflare/vitest-plugin
 │   ├── wrangler.toml        # no secrets; those are set with `wrangler secret put`
 │   └── README.md            # setup, configuration and deploy instructions
 ├── app/                     # Python back end
@@ -416,16 +432,17 @@ habit-tracker/
 │   ├── log.py, redaction.py # rotating logs; secret masking
 │   ├── errors.py, error_page.py  # error reports with IDs; the in-window error page
 │   ├── devserver.py         # Vite dev server for dev mode
-│   ├── notion/              # auth (OAuth, pasted tokens, refresh), client, pagination, property readers
+│   ├── single_instance.py   # one running copy per data folder (named mutex)
+│   ├── notion/              # handoff, loopback listener, credentials, tokens (renewal), service client, read-only client, connection (connect, picker, logout); later: pagination, property readers
 │   ├── sync/                # quick sync, full sync, schema check
 │   ├── mapping/             # auto-matcher, extra fields
 │   ├── validation/          # entry checks
 │   ├── stats/               # daily totals, weeks, streaks, midnight split
-│   └── db/                  # connections, migrator, migrations/*.sql, queries
+│   └── db/                  # connections, migrator, migrations/*.sql, settings, queries
 ├── ui/                      # React + Vite front end
 │   ├── src/                 # bridge/, errors/, components/, tests next to the code
 │   └── plugins/             # Vite plugins (Content-Security-Policy)
-├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui)
+├── tests/                   # pytest; tests/e2e drives the real window (pytest -m gui); tests/support has the fake Notion, in-memory keyring, hand-off vectors and screenshots
 └── packaging/               # PyInstaller spec, Inno Setup script
 ```
 
@@ -438,12 +455,12 @@ Each phase ends with something the user can run and check. Every phase after Pha
 | 0. Project setup | Install and verify every tool, configure Git, create the GitHub repository, and add the housekeeping files. Full checklist in 15.1. | The private GitHub repo exists with the first commit pushed, every tool reports its version, and `docs/setup.md` records them. |
 | 1. Explore the extension | Read the Chrome extension at `C:\Users\LENOVO\Documents\JS\myNotionNotes` without modifying it. Document its auth flow, Notion API calls, pagination and error handling in `docs/extension-notes.md`. Propose the auth design. | The user approves the notes and the auth design. |
 | 2. Scaffold | Set up the Python package with `uv`, the React/Vite UI, the pywebview window and bridge, the SQLite schema with migrations, and the `%APPDATA%` paths. Add CI (GitHub Actions on `windows-latest`: ruff, pytest, TypeScript type check, UI build), pre-commit hooks for ruff and formatting, and Dependabot for Python, npm and Actions. | The app window opens on Windows, the UI calls a test Python method, and CI passes on the pull request. |
-| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | The user connects through OAuth and sees their Work Log in the picker. Connecting with an internal integration token and with a PAT also works. Logout revokes and removes the token. Service and app tests pass in CI. |
+| 3. Connect | **Before the integration exists:** write the pages in `service/pages/` and deploy them with the service. Create the "Habit Tracker" public integration (12.1) and submit it for review. Claude Code gives the user exact steps for each manual part.<br>**Token service:** build `service/` with its tests and README, and add it to CI and Dependabot. Help the user create a Cloudflare account and set the secrets, then deploy.<br>**App:** build the OAuth connect flow with the encrypted one-time hand-back (12.3), the pasted-token path for internal integration tokens and PATs (12.4), Credential Manager storage with serialized refresh (12.5), the database picker (12.6), logout (12.7), the single-instance guard, and every connect, error and outage state. Write tests for the state signing, hand-back crypto, replay and expiry rejection, refresh serialization and token storage. | **(a)** With a personal access token, the user connects, sees their workspace, picks their Work Log, logs out and reconnects; all CI checks pass. **(b)** The token service is deployed and its tests pass. **(c)** OAuth sign-in from the app works end to end. **(d)** OAuth sign-in from the app also works for a second Notion workspace that doesn't own the integration; if Notion blocks it pending review, what the review requires is recorded here. |
 | 4. Map | Build auto-matching, the review screen, extra-field selection, and missing-required-field errors. | The author's Work Log maps correctly, and a fixture schema missing an end-time column shows a clear error (covered by tests and viewable in the UI with that fixture). |
 | 5. Sync | Implement full sync, quick sync, the schema check, validation, progress events, and retries. Write tests for sync and validation logic. | A fresh install syncs all entries; edits appear after relaunch; deletions disappear after full sync; every broken-entry fixture is flagged correctly, and every broken entry in Work Log (test) is flagged correctly. |
 | 6. Dashboard | Build the four charts, streak logic, the midnight split, settings, and empty states. Write tests for the stats logic. | The charts match manually checked totals. |
 | 7. Raw logs | Build the table with filters, red issue cells, hover explanations, and Notion links. | Every filter works, and flagged entries show the correct explanations. |
-| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, and a README for other users. | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. |
+| 8. Package | Set up the PyInstaller build, the Inno Setup installer, the WebView2 check, the release workflow, a README for other users, and the privacy-policy change notice (13). | `Setup.exe` downloaded from a GitHub Release installs and runs on a clean Windows machine. A test build with a newer policy version shows the notice once on its first launch, and never contacts the website. |
 
 ### 15.1 Phase 0 checklist: project setup
 
@@ -517,8 +534,8 @@ Phase 0 is the only phase committed directly to `main`.
 ## 16. Open items
 
 - License: undecided. It must be chosen before the repository or app is shared publicly.
-- Notion review for the public integration: Notion's public docs say only that the Authorization URL appears after the connection is "submitted for review". The exact fields and timeline will be seen in the developer portal in Phase 3. Until the review completes, Phase 3 testing can use the pasted-token path.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
+- Notion review for other workspaces: sign-in without review is verified live only in the author's own workspace (2026-10-20). Phase 3 check (d) (a second Notion account) was accepted by the user's decision without being verified (2026-10-22). If another workspace's sign-in is ever blocked pending review, find out what Notion's review requires, record it here and in the Decisions log, and submit the connection.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
 
 ## 17. Decisions log
@@ -563,3 +580,27 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-18 | Phase 2 review: approved pinning TypeScript to 6.0.x until typescript-eslint supports TypeScript 7 (10). |
 | 2026-10-18 | Phase 2 review: Node.js moves to Scoop (`nodejs-lts`, 24.22.0), replacing the nodejs.org install in `C:\Program Files\nodejs`, so every tool now comes from Scoop. `.node-version` pins CI to the same exact version, and `ui/package.json` `engines` requires `>=24.22.0` (enforced by `engine-strict` in `ui/.npmrc`). jsdom is upgraded to 30, which needs Node 24.15 or later. |
 | 2026-10-18 | Phase 2 review: no branch protection on `main`, and no GitHub Pro upgrade for it. The manual rule stays: never merge a pull request without the user's explicit approval, and only with CI passing. This supersedes the plan to apply branch protection later. |
+| 2026-10-18 | Phase 3 plan: OAuth is tried with the public connection as soon as it exists. Notion's docs say review is needed only for a Marketplace listing (not part of v1), so a review is submitted only if Notion blocks unreviewed connections. The encrypted hand-off travels in the loopback redirect's query string; it can't be decrypted once the app's one-time key is gone. Workspace icons reach the UI as data URIs (a first letter for pasted tokens), keeping the UI's CSP strict. The full OAuth flow is tested offline against a fake Notion with `wrangler dev`. |
+| 2026-10-18 | Phase 3: the Worker's tests use `@cloudflare/vitest-plugin`, the renamed and maintained successor of the deprecated `@cloudflare/vitest-pool-workers`, with Vitest 5 (as in `ui/`). |
+| 2026-10-18 | Phase 3: Cloudflare's automatic invocation logs are off for the Worker, because they record full request URLs (Notion's code and the state on `/callback`). Only the Worker's own lines (route, method, status, duration) are kept (12.2). |
+| 2026-10-18 | Phase 3: the public pages' wording follows what the app does for each way of connecting, including that a personal access token has the creator's full access, though the app sends only read requests. Terms are governed by the laws of India, with the courts at New Delhi having jurisdiction. The privacy policy keeps the "not aimed at children under 13" line and dates from the first deploy. |
+| 2026-10-18 | Phase 3: the privacy policy promises notice of data-handling changes. Notices ship only inside app updates, shown on the first launch of the new version, and the app never contacts the website for them. Tracked as a Phase 8 requirement (13, 15), with a new `acknowledged_policy_version` setting (11). |
+| 2026-10-18 | Phase 3 token service details (`docs/handoff-protocol.md`):
+- **Errors are encrypted too.** The Worker returns every sign-in outcome, including cancel, access denied and Notion errors, in the encrypted envelope, so the app reacts at once instead of waiting for its 5-minute timeout.
+- **Clock correction.** `/start` returns `server_time`, which corrects the app's expiry check for a wrong PC clock.
+- **Origin requests refused.** `POST` routes refuse requests that carry an `Origin` header, so a web page can't drive them.
+- **Bodies capped.** Request bodies are limited to 4 KB.
+- **Redirect URI.** It is the Worker's own origin + `/callback`.
+- **Rate limits per IP.** OAuth routes allow 20 requests a minute, and pages 120.
+- **Deploy guard.** `npm run deploy` refuses while any page placeholder is unfilled, and runs the tests first. |
+| 2026-10-20 | Phase 3: confirmed live that the unreviewed "Habit Tracker" public connection signs in through the deployed token service (`https://habit-tracker.mrathour.workers.dev`), and that the hand-off and revoke work. **This is verified only for the author's own workspace, where the author owns the connection.** Whether a workspace the author doesn't own can sign in without review is checked in Phase 3 verification (d). Until (d) passes, "no review needed" is not assumed for other users. |
+| 2026-10-20 | Phase 3 app auth decisions:
+- **Isolated copies.** A copy of the app pointed at another data folder (`HABIT_TRACKER_HOME`) uses its own Credential Manager account (`notion-<hash>`) and its own single-instance lock, so tests and throwaway copies never touch the real connection. A second launch focuses the running window and exits.
+- **Retries.** The read-only Notion client also retries 5xx on read-only POSTs (search, query), which `notion-client` won't retry. A request is renewed at most once on 401; a second 401 means "Reconnect to Notion".
+- **Pasted-token check.** A pasted token is checked with `GET /v1/users/me` from memory and stored only if Notion accepts it. A person returned by `users/me` (personal access tokens) is shown by name.
+- **Error codes for the UI.** Error reports carry a `code` (the error's UI state) so screens can offer the right action.
+- **No secrets in settings.** `settings` refuses keys that sound like secrets.
+- **Opening links.** Only HTTPS links to Notion and the token service open in the browser. |
+| 2026-10-20 | Phase 3 UI: the app's visual style is a time sheet: Bahnschrift for headings and figures, Segoe UI Variable for text, ledger green `#2f6f5e` on a cool grey. No web fonts, so the CSP stays strict and the UI works offline. The Connect screen's hero is a week of sessions on a 24-hour strip. |
+| 2026-10-20 | Phase 3 testing: end-to-end window tests run against a fake Notion served over HTTP. For OAuth they also run the real token service locally with `wrangler dev`, with a scripted browser following the real redirects. Every test uses an in-memory keyring. The token service gets its own CI job and Dependabot entry, and pre-commit hooks for `service/`. |
+| 2026-10-22 | Phase 3 approved. The user ran checks (a), (b) and (c). Check (d), signing in from a second Notion account, was **accepted by the user's decision without being verified**. "No review needed" is confirmed live only for the author's own workspace. If sign-in from another workspace is ever blocked, it is handled then (see Open items). |

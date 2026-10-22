@@ -36,6 +36,9 @@ class AppError(Exception):
         self.user_message = message
         self.detail = detail
 
+    #: A machine-readable state the UI can switch on. Subclasses override it.
+    state: str | None = None
+
 
 @dataclass(frozen=True, slots=True)
 class ErrorReport:
@@ -43,6 +46,8 @@ class ErrorReport:
     kind: ErrorKind
     message: str
     detail: str | None
+    #: A machine-readable state for the UI, such as "reconnect" or "offline" (AppError.state).
+    code: str | None = None
 
     def to_dict(self) -> dict[str, str | None]:
         return asdict(self)
@@ -67,7 +72,7 @@ def report_exception(exc: BaseException, *, context: str) -> ErrorReport:
             "%s failed [error %s]: %s", context, error_id, exc.user_message, exc_info=exc
         )
         detail = redact(exc.detail) if exc.detail else None
-        return ErrorReport(error_id, "expected", redact(exc.user_message), detail)
+        return ErrorReport(error_id, "expected", redact(exc.user_message), detail, exc.state)
     logger.error("Unexpected error in %s [error %s]", context, error_id, exc_info=exc)
     return ErrorReport(error_id, "unexpected", UNEXPECTED_MESSAGE, describe_exception(exc))
 

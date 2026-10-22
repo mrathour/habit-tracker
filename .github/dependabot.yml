@@ -29,6 +29,21 @@ updates:
       - dependency-name: typescript
         versions: [">=6.1.0"]
 
+  - package-ecosystem: npm
+    directory: /service
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps(service)
+    groups:
+      service-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Same TypeScript pin as ui/ (PLAN.md Decisions log, 2026-10-18).
+      - dependency-name: typescript
+        versions: [">=6.1.0"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

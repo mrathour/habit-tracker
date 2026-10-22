@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import platform
 import sys
 import threading
@@ -26,12 +27,19 @@ from typing import Any, Final
 from app import APP_NAME, __version__
 from app.api import Api, AppContext, Mode
 from app.db import Database, open_database
+from app.db.settings import Settings
 from app.devserver import DEFAULT_DEV_URL, ViteDevServer, ensure_dev_server
 from app.error_page import render_error_page
 from app.errors import AppError, ErrorReport, install_excepthooks, report_exception
 from app.events import EventChannel
 from app.log import adopt_pywebview_logger, configure_logging
+from app.notion.client import DEFAULT_NOTION_URL, NOTION_URL_ENV_VAR, NotionReader
+from app.notion.connection import ConnectionService
+from app.notion.credentials import CredentialStore
+from app.notion.service_client import DEFAULT_SERVICE_URL, SERVICE_URL_ENV_VAR, TokenServiceClient
+from app.notion.tokens import TokenManager
 from app.paths import AppPaths, resource_root, ui_dist_dir
+from app.single_instance import SingleInstance, bring_existing_window_to_front
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +179,28 @@ class UiReadyWatchdog:
                 self._armed = False
 
 
+def build_connection(
+    paths: AppPaths, database: Database, events: EventChannel
+) -> ConnectionService:
+    """Wire the Notion connection: Credential Manager, token service, reader and settings."""
+    service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
+    notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
+    tokens = TokenManager(CredentialStore(paths.credential_account), service)
+
+    def make_reader(manager: TokenManager) -> NotionReader:
+        return NotionReader(manager, base_url=notion_url)
+
+    return ConnectionService(
+        tokens=tokens,
+        reader=make_reader(tokens),
+        service=service,
+        settings=Settings(database.connection),
+        db=database.connection,
+        emit=events.emit,
+        make_reader=make_reader,
+    )
+
+
 def run_window(
     args: argparse.Namespace,
     paths: AppPaths,
@@ -194,6 +224,7 @@ def run_window(
         database=startup.database,
         events=events,
         diagnostics=args.dev or args.diagnostics,
+        connection=build_connection(paths, startup.database, events) if startup.database else None,
     )
     install_excepthooks(lambda report: events.emit("app:error", report.to_dict()))
 
@@ -291,16 +322,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.self_check:
         return self_check(args, paths, log_file)
 
-    try:
-        return run_window(args, paths)
-    except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing
-        report = report_exception(exc, context="the window")
-        show_fatal_message(
-            f"{APP_NAME} couldn't open its window.\n\n{report.detail or report.message}\n\n"
-            f"Error ID {report.id}. Details are in the log folder:\n{paths.logs_dir}\n\n"
-            "If this keeps happening, check that the Microsoft Edge WebView2 Runtime is installed."
-        )
-        return 1
+    with SingleInstance(paths.instance_lock_name) as instance:
+        if instance.already_running:
+            logger.info("Habit Tracker is already running; bringing its window to the front")
+            if not bring_existing_window_to_front(APP_NAME):
+                show_fatal_message(f"{APP_NAME} is already running.")
+            return 0
+        try:
+            return run_window(args, paths)
+        except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing
+            report = report_exception(exc, context="the window")
+            show_fatal_message(
+                f"{APP_NAME} couldn't open its window.\n\n{report.detail or report.message}\n\n"
+                f"Error ID {report.id}. Details are in the log folder:\n{paths.logs_dir}\n\n"
+                "If this keeps happening, check that the Microsoft Edge WebView2 Runtime is "
+                "installed."
+            )
+            return 1
 
 
 if __name__ == "__main__":

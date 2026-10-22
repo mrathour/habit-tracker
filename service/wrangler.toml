@@ -1,0 +1,41 @@
+# Habit Tracker token service (PLAN.md 12.2). No secrets here: the client secret and the
+# state-signing key are set with `wrangler secret put` (see docs/token-service.md).
+name = "habit-tracker"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+# Text modules: the static pages are bundled with the Worker.
+rules = [
+  { type = "Text", globs = ["**/*.html", "**/*.css", "**/*.txt"], fallthrough = true },
+  { type = "Data", globs = ["**/*.png"], fallthrough = true },
+]
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+# Cloudflare's automatic invocation logs record the full request URL, which on /callback holds
+# Notion's one-time code and the state. They stay off; only src/log.ts lines are kept, and those
+# hold the route, status and duration, never URLs with parameters, bodies or headers.
+invocation_logs = false
+head_sampling_rate = 1
+
+[vars]
+# The Notion OAuth client ID is public. It's set once the Notion connection exists.
+NOTION_CLIENT_ID = "3ffd872b-594c-81fa-a7d5-003757ac19e0"
+NOTION_API_BASE = "https://api.notion.com"
+
+# Per-IP rate limits (PLAN.md 12.2), counted over one minute and not kept beyond it.
+# namespace_id is an arbitrary integer that names the counter; it isn't a secret.
+[[ratelimits]]
+name = "OAUTH_LIMITER"
+namespace_id = "2001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "PAGE_LIMITER"
+namespace_id = "2002"
+simple = { limit = 120, period = 60 }
