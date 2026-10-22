@@ -1,19 +1,31 @@
 import type { ConnectionInfo } from "../bridge/types";
 import { WorkspaceBadge } from "../components/WorkspaceBadge";
+import { SyncPanel } from "../sync/SyncPanel";
+import type { SyncState } from "../sync/useSync";
 
 /** Connected and a work log chosen. The charts arrive with syncing (PLAN.md phases 5–6). */
 export function HomeView({
   info,
+  sync,
   justSaved = null,
   onChangeDatabase,
   onReviewMapping,
+  onPasteNewToken,
 }: {
   info: ConnectionInfo;
+  sync: SyncState;
+  onPasteNewToken: () => void;
   /** Set right after the mapping screen saved, to confirm it. */
   justSaved?: { fullSync: boolean } | null;
   onChangeDatabase: () => void;
   onReviewMapping: () => void;
 }) {
+  // The sync status is live; the connection's copy of the flag is only as fresh as its last read.
+  const fullSyncNeeded =
+    sync.load.status === "ready"
+      ? sync.load.sync.full_sync_required && sync.load.sync.running?.kind !== "full"
+      : Boolean(info.full_sync_required);
+
   return (
     <section className="column" aria-labelledby="home-title">
       <h1 id="home-title" className="section-title">
@@ -24,15 +36,12 @@ export function HomeView({
           <p>Column mapping saved.</p>
         </div>
       )}
-      {info.full_sync_required && (
+      {fullSyncNeeded && info.full_sync_required && (
         <div className="notice warn" role="status" aria-label="Full sync required">
           <strong>
             {justSaved?.fullSync ? "Mapping saved: a full sync is needed" : "A full sync is needed"}
           </strong>
-          <p>
-            {info.full_sync_required.reason} It runs the next time Habit Tracker syncs your work
-            log.
-          </p>
+          <p>{info.full_sync_required.reason} It runs with the next sync.</p>
         </div>
       )}
       <div className="panel">
@@ -40,7 +49,8 @@ export function HomeView({
         <p>
           Habit Tracker is connected and reads{" "}
           <strong>{info.database_title ?? "your work log"}</strong>. Your daily totals, weekly
-          trends and streaks appear here once its entries have been copied to this computer.
+          trends and streaks arrive here in the next version; for now, this page shows what each
+          sync copied and which entries need a look.
         </p>
         <div className="actions">
           <button type="button" className="button" onClick={onReviewMapping}>
@@ -51,6 +61,12 @@ export function HomeView({
           </button>
         </div>
       </div>
+      <SyncPanel
+        info={info}
+        state={sync}
+        onOpenMapping={onReviewMapping}
+        onPasteNewToken={onPasteNewToken}
+      />
     </section>
   );
 }

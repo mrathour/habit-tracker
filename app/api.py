@@ -31,6 +31,7 @@ from app.paths import AppPaths
 if TYPE_CHECKING:
     from app.mapping.review import MappingReview, MappingService, SaveResult
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
+    from app.sync.engine import FlaggedPage, SyncService, SyncStatus
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ class AppContext:
     open_folder: Callable[[Path], None] = field(default=lambda path: _open_in_explorer(path))
     connection: ConnectionService | None = None
     mapping: MappingService | None = None
+    sync: SyncService | None = None
     open_url: Callable[[str], object] = field(default=lambda url: _open_in_browser(url))
 
 
@@ -244,6 +246,32 @@ class Api:
     @bridge_method
     def save_mapping(self, fields: object, extra: object) -> SaveResult:
         return self._mapping().save(fields, extra)
+
+    # --- Sync (PLAN.md 6) ------------------------------------------------------------------
+
+    def _sync(self) -> SyncService:
+        if self._ctx.sync is None:
+            raise AppError("Syncing isn't available because the app didn't start.")
+        return self._ctx.sync
+
+    @bridge_method
+    def get_sync_status(self) -> SyncStatus:
+        return self._sync().status()
+
+    @bridge_method
+    def start_sync(self, kind: object = "auto") -> SyncStatus:
+        """Start a sync in the background ("auto", "quick" or "full"); progress arrives as
+        sync:status events."""
+        return self._sync().start(kind)
+
+    @bridge_method
+    def get_flagged_entries(self, offset: object = 0, limit: object = 50) -> FlaggedPage:
+        return self._sync().flagged_entries(offset, limit)
+
+    @bridge_method
+    def resolve_pending_removal(self, remove: object) -> SyncStatus:
+        """Answer the mass-removal question: remove the entries, or keep them."""
+        return self._sync().resolve_pending_removal(remove)
 
     @bridge_method
     def open_external(self, url: object) -> None:

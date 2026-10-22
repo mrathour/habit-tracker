@@ -11,10 +11,12 @@ import {
   connectedUnmapped,
   connectedWithDatabase,
   failWith,
+  fullSyncDone,
   installFakeBridge,
   ok,
   removeFakeBridge,
   reviews,
+  synced,
 } from "../test/fakeBridge";
 
 beforeEach(() => {
@@ -329,7 +331,7 @@ describe("changing a saved mapping", () => {
     expect(await screen.findByRole("heading", { name: "Work Log" })).toBeInTheDocument();
   });
 
-  it("records that a full sync is required after a change", async () => {
+  it("runs the full sync a changed mapping needs, and flags it until it succeeds", async () => {
     const flag = {
       since: "2026-10-22T10:00:00.000Z",
       reason: "The column mapping changed, so entries already copied need the new columns.",
@@ -343,10 +345,24 @@ describe("changing a saved mapping", () => {
     ).toBeInTheDocument();
     api.save_mapping.mockImplementation(() => ok({ changed: true, full_sync_required: flag }));
     api.get_connection.mockImplementation(() => ok({ ...saved, full_sync_required: flag }));
+    // The full sync can't run (offline), so the flag stays and Home says so.
+    const offline = {
+      ...synced,
+      full_sync_required: true,
+      last_result: {
+        ...fullSyncDone,
+        ok: false,
+        error: { id: "e1", code: "offline" as const, message: "Offline.", issues: [] },
+      },
+    };
+    api.start_sync.mockImplementation(() => ok(offline));
+    api.get_sync_status.mockImplementation(() => ok(offline));
+    api.start_sync.mockClear();
     await userEvent.click(saveButton());
     const notice = await screen.findByRole("status", { name: "Full sync required" });
     expect(notice).toHaveTextContent("Mapping saved: a full sync is needed");
     expect(notice).toHaveTextContent(flag.reason);
+    expect(api.start_sync).toHaveBeenCalledWith("auto");
 
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(await screen.findByText("Full sync required")).toBeInTheDocument();

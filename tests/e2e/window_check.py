@@ -18,7 +18,12 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
   a fake Notion, with a scripted browser following the real redirects; then disconnect;
 * ``connect-oauth-deny``: the same, declining access in "Notion";
 * ``mapping``: the column mapping screen: a database with no end-time column, then the Work
-  Log's automatic mapping, saving, reopening and changing it (full sync required).
+  Log's automatic mapping, saving, reopening and changing it (full sync required);
+* ``sync-first``: connect, map and let the first sync copy every entry (good and broken), then
+  save the fake Notion and keyring to the data folder;
+* ``sync-relaunch``: a second launch on that folder: Notion edits and a deletion are made first;
+  the launch's quick sync picks up the edits, and a full sync from Settings removes the deleted
+  entry.
 
 Results are written as JSON; the process exits 0 even when a check fails, so the test can
 report every finding.
@@ -48,9 +53,17 @@ from app.main import parse_args, run_window
 from app.notion.client import NOTION_URL_ENV_VAR
 from app.notion.service_client import SERVICE_URL_ENV_VAR
 from app.paths import AppPaths
+from tests.support.fake_notion import FakeDatabase, FakeDataSource
 from tests.support.fake_notion_server import FakeNotionServer
 from tests.support.memory_keyring import MemoryKeyring
-from tests.support.notion_schemas import add_source, without, work_log_rows, work_log_schema
+from tests.support.notion_schemas import (
+    add_source,
+    broken_rows,
+    when,
+    without,
+    work_log_rows,
+    work_log_schema,
+)
 
 TIMEOUT_S = 30.0
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -340,6 +353,111 @@ def mapping(fake: FakeNotionServer) -> Scenario:
     return scenario
 
 
+SYNC_DONE = "document.querySelector('.sync-done') !== null"
+STATE_FILE = "e2e-state.json"
+
+
+def wait_for_sync(window: Any, kind: str) -> None:
+    wait_for(
+        window,
+        "(() => { const el = document.querySelector('.sync-done');"
+        f" return el !== null && el.innerText.startsWith({json.dumps(kind)}); }})()",
+        timeout=60,
+    )
+
+
+def panel_text(window: Any) -> dict[str, Any]:
+    return {
+        "panel": text(window, "[aria-labelledby='sync-title']"),
+        "flagged": window.evaluate_js(
+            "[...document.querySelectorAll('.flagged-entry')].map((li) => li.innerText)"
+        ),
+        "indicator": text(window, ".sync-indicator"),
+    }
+
+
+def save_state(fake: FakeNotionServer, home: Path) -> None:
+    """Keep the fake Notion and the in-memory keyring for the next launch (a new process)."""
+    notion = fake.notion
+    state = {
+        "databases": [vars(db) for db in notion.databases.values()],
+        "data_sources": [vars(ds) for ds in notion.data_sources.values()],
+        "valid_tokens": sorted(notion.valid_tokens),
+        "keyring": [[svc, user, value] for (svc, user), value in MemoryKeyring.store.items()],
+    }
+    (home / STATE_FILE).write_text(json.dumps(state), encoding="utf-8")
+
+
+def load_state(fake: FakeNotionServer, home: Path) -> None:
+    state = json.loads((home / STATE_FILE).read_text(encoding="utf-8"))
+    notion = fake.notion
+    notion.workspace_name = "E2E Workspace"
+    for db in state["databases"]:
+        notion.databases[db["id"]] = FakeDatabase(**db)
+    for ds in state["data_sources"]:
+        notion.data_sources[ds["id"]] = FakeDataSource(**ds)
+    notion.valid_tokens = set(state["valid_tokens"])
+    for svc, user, value in state["keyring"]:
+        MemoryKeyring.store[(svc, user)] = value
+
+
+def sync_first(fake: FakeNotionServer, home: Path) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        paste_token(window, fake.notion.issue_token())
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log (test)")
+        click(window, "Use this database")
+        wait_for(window, MAPPING_LOADED)
+        click(window, "Save mapping")
+        wait_for(window, heading_is("Work Log (test)"))
+        wait_for_sync(window, "Full sync")
+        wait_for(window, "document.querySelectorAll('.flagged-entry').length > 0")
+        results["first"] = panel_text(window)
+        snap("sync-first")
+        save_state(fake, home)
+
+    return scenario
+
+
+def sync_relaunch(fake: FakeNotionServer, home: Path) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        # The launch's own sync: a quick sync (the full one ran minutes ago).
+        wait_for(window, heading_is("Work Log (test)"))
+        wait_for_sync(window, "Quick sync")
+        wait_for(window, "document.querySelectorAll('.flagged-entry').length > 0")
+        results["relaunch"] = panel_text(window)
+        snap("sync-relaunch")
+        # A full sync from Settings removes the entry deleted in Notion.
+        click(window, "Settings")
+        wait_for(window, heading_is("Settings"))
+        click(window, "Run full sync")
+        click(window, "Home")
+        wait_for_sync(window, "Full sync")
+        results["full"] = panel_text(window)
+        snap("sync-full")
+
+    return scenario
+
+
+def edit_in_notion(fake: FakeNotionServer) -> None:
+    """What the user does in Notion between the two launches."""
+    notion = fake.notion
+    notion.edit_page(
+        "p-mismatch",
+        Name=[
+            {
+                "type": "text",
+                "plain_text": "Mismatch, renamed",
+                "text": {"content": "Mismatch, renamed"},
+            }
+        ],
+    )
+    notion.edit_page("p-no-end", **{"End Time": when("2026-10-21T09:30:00.000+05:30")})
+    notion.delete_page("p-ok")  # fmt: skip
+
+
 def scripted_browser(results: dict[str, Any]) -> Callable[[str], bool]:
     """Stands in for the system browser: follows the real redirect chain."""
 
@@ -488,6 +606,24 @@ def main() -> int:
             fake.notion.me_type = "person"
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(connect_token(fake))
+    elif name in ("sync-first", "sync-relaunch"):
+        home = paths.root
+        with FakeNotionServer() as fake:
+            if name == "sync-first":
+                fake.notion.workspace_name = "E2E Workspace"
+                add_source(
+                    fake.notion,
+                    "Work Log (test)",
+                    work_log_schema(),
+                    work_log_rows() + broken_rows(),
+                )
+                scenario = sync_first(fake, home)
+            else:
+                load_state(fake, home)
+                edit_in_notion(fake)
+                scenario = sync_relaunch(fake, home)
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            exit_code = open_window(scenario)
     elif name == "mapping":
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)

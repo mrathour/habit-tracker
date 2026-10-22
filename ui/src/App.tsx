@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { callPython, waitForBridge } from "./bridge/client";
 import type { ConnectionInfo } from "./bridge/types";
@@ -7,6 +7,8 @@ import { ErrorBanners } from "./components/ErrorBanners";
 import { useAppInfo } from "./components/useAppInfo";
 import { WorkspaceBadge } from "./components/WorkspaceBadge";
 import { useConnection } from "./connection/useConnection";
+import { SyncIndicator } from "./sync/SyncIndicator";
+import { useSync } from "./sync/useSync";
 import { ConnectView } from "./views/ConnectView";
 import { HomeView } from "./views/HomeView";
 import { MappingView } from "./views/MappingView";
@@ -48,6 +50,19 @@ export function App() {
   const details = appInfo.status === "ready" ? appInfo.info : null;
   const info = connection.load.status === "ready" ? connection.load.info : null;
 
+  // Syncing needs a connection, a chosen work log and a saved mapping. Each launch runs one
+  // sync ("auto": quick, or full when it's due), once those are in place (PLAN.md 6.1).
+  const canSync = Boolean(info?.connected && info.data_source_id && info.mapping_saved);
+  const sync = useSync(canSync);
+  const launched = useRef(false);
+  const startSync = sync.start;
+  useEffect(() => {
+    if (canSync && !launched.current) {
+      launched.current = true;
+      startSync("auto");
+    }
+  }, [canSync, startSync]);
+
   const go = (next: View) => {
     setView(next);
     setChoosing(false);
@@ -78,6 +93,7 @@ export function App() {
           Habit Tracker
         </span>
         {info?.connected && <WorkspaceBadge info={info} small />}
+        {canSync && sync.load.status === "ready" && <SyncIndicator sync={sync.load.sync} />}
         {details?.mode === "dev" && <span className="dev-flag">Dev mode</span>}
         <nav aria-label="Main">
           <button
@@ -147,6 +163,7 @@ export function App() {
               setMappingSaved(null);
               setMapping(true);
             }}
+            sync={canSync ? sync : null}
           />
         )}
         {info && view === "home" && !info.connected && (
@@ -176,6 +193,9 @@ export function App() {
               connection.setInfo(updated);
               setMapping(false);
               setMappingSaved({ fullSync: result.changed });
+              // First setup copies every entry; a changed mapping refreshes them all.
+              launched.current = true;
+              sync.start("auto");
             }}
             onCancel={
               info.mapping_saved
@@ -191,6 +211,8 @@ export function App() {
         {info && view === "home" && ready && !mapping && info.mapping_saved && (
           <HomeView
             info={info}
+            sync={sync}
+            onPasteNewToken={pasteNewToken}
             justSaved={mappingSaved}
             onChangeDatabase={chooseDatabase}
             onReviewMapping={() => {

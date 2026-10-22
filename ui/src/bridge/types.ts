@@ -24,7 +24,9 @@ export type ErrorCode =
   | "confirm_replace"
   | "no_database"
   | "source_unavailable"
-  | "mapping_invalid";
+  | "mapping_invalid"
+  | "not_ready"
+  | "schema_blocked";
 
 export type AuthKind = "oauth" | "internal" | "pat";
 export type PastedKind = "internal" | "pat";
@@ -146,6 +148,82 @@ export interface SaveMappingResult {
   full_sync_required: FullSyncFlag | null;
 }
 
+// --- Sync (app/sync/engine.py) ------------------------------------------------------------
+
+export type SyncKind = "quick" | "full";
+export type SyncRequest = "auto" | SyncKind;
+
+export interface SyncProgress {
+  kind: SyncKind | null;
+  phase: "checking" | "fetching" | "removing";
+  pages_fetched: number;
+  added: number;
+  updated: number;
+  removed: number;
+}
+
+export interface SyncError {
+  id: string;
+  code: ErrorCode | null;
+  message: string;
+  /** For "schema_blocked": what changed in Notion. */
+  issues: SchemaIssue[];
+}
+
+export interface SyncResult {
+  kind: SyncKind | null;
+  reason: string | null;
+  finished_at: string;
+  ok: boolean;
+  added: number;
+  updated: number;
+  removed: number;
+  flagged: number;
+  skipped: number;
+  warnings: string[];
+  pending_removal: number | null;
+  error: SyncError | null;
+}
+
+export interface PendingRemoval {
+  count: number;
+  total: number;
+  found_at: string;
+}
+
+export interface SyncStatus {
+  running: SyncProgress | null;
+  last_result: SyncResult | null;
+  last_successful_sync: string | null;
+  last_full_sync: string | null;
+  entries: number;
+  flagged: number;
+  pending_removal: PendingRemoval | null;
+  full_sync_required: boolean;
+}
+
+export interface Issue {
+  /** "start", "end", "logged_minutes" or "extra:<property id>". */
+  field: string;
+  code: "missing_time" | "invalid_range" | "duration_mismatch" | "unreadable_extra";
+  message: string;
+}
+
+export interface FlaggedEntry {
+  page_id: string;
+  display_id: string | null;
+  task_name: string | null;
+  start_utc: string | null;
+  end_utc: string | null;
+  issues: Issue[];
+  url: string;
+}
+
+export interface FlaggedPage {
+  entries: FlaggedEntry[];
+  total: number;
+}
+
 export interface DataSourceChoice {
   id: string;
   name: string;
@@ -238,6 +316,10 @@ export interface PythonApi {
     fields: Record<FieldKey, FieldRef | null>,
     extra: string[],
   ): Promise<BridgeResponse<SaveMappingResult>>;
+  get_sync_status(): Promise<BridgeResponse<SyncStatus>>;
+  start_sync(kind: SyncRequest): Promise<BridgeResponse<SyncStatus>>;
+  get_flagged_entries(offset: number, limit: number): Promise<BridgeResponse<FlaggedPage>>;
+  resolve_pending_removal(remove: boolean): Promise<BridgeResponse<SyncStatus>>;
   open_external(url: string): Promise<BridgeResponse<null>>;
 }
 
@@ -248,6 +330,7 @@ export interface BackendEvents {
   "app:error": ErrorReport;
   "connect:waiting": { timeout_s: number };
   "connect:done": { result: SignInResult; message?: string; connection?: ConnectionInfo };
+  "sync:status": SyncStatus;
 }
 
 export type BackendEventName = keyof BackendEvents;

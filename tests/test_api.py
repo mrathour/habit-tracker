@@ -32,6 +32,10 @@ PUBLIC_METHODS = {
     "choose_data_source",
     "get_mapping_review",
     "save_mapping",
+    "get_sync_status",
+    "start_sync",
+    "get_flagged_entries",
+    "resolve_pending_removal",
     "open_external",
 }
 

@@ -10,6 +10,8 @@ import { WorkspaceBadge } from "../components/WorkspaceBadge";
 import { authKindLabel, connectionLabel, disconnectSummary } from "../connection/labels";
 import { TokenForm } from "../connection/TokenForm";
 import { noticeFromCallError } from "../errors/reporting";
+import { formatWhen } from "../sync/format";
+import type { SyncState } from "../sync/useSync";
 import { DisconnectDialog } from "./DisconnectDialog";
 
 export function SettingsView({
@@ -19,6 +21,7 @@ export function SettingsView({
   onChangeDatabase,
   onReviewMapping,
   focusAdvanced = false,
+  sync = null,
 }: {
   info: ConnectionInfo;
   appInfo: AppInfoState;
@@ -26,6 +29,8 @@ export function SettingsView({
   onChangeDatabase: () => void;
   onReviewMapping: () => void;
   focusAdvanced?: boolean;
+  /** Present when syncing is possible: connected, work log chosen, columns mapped. */
+  sync?: SyncState | null;
 }) {
   const [disconnecting, setDisconnecting] = useState(false);
   const [summary, setSummary] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
@@ -63,7 +68,9 @@ export function SettingsView({
                   <dt>Columns</dt>
                   <dd>
                     {info.mapping_saved ? "Mapped" : "Not mapped yet"}
-                    {info.full_sync_required && (
+                    {(sync?.load.status === "ready"
+                      ? sync.load.sync.full_sync_required
+                      : Boolean(info.full_sync_required)) && (
                       <span className="chip warn">Full sync required</span>
                     )}
                   </dd>
@@ -97,6 +104,47 @@ export function SettingsView({
           </p>
         )}
       </section>
+
+      {sync?.load.status === "ready" && (
+        <section className="panel" aria-labelledby="settings-sync">
+          <h2 id="settings-sync">Sync</h2>
+          <dl className="facts">
+            <dt>Last sync</dt>
+            <dd>
+              {sync.load.sync.last_successful_sync
+                ? formatWhen(sync.load.sync.last_successful_sync)
+                : "Never"}
+            </dd>
+            <dt>Last full sync</dt>
+            <dd>
+              {sync.load.sync.last_full_sync ? formatWhen(sync.load.sync.last_full_sync) : "Never"}
+            </dd>
+            <dt>Entries</dt>
+            <dd className="figure">{sync.load.sync.entries.toLocaleString()}</dd>
+          </dl>
+          <p className="small muted">
+            Each launch copies new and edited entries. A full sync reads every entry again: it
+            refreshes formula and rollup values, which Notion doesn&apos;t mark as edits, and
+            removes entries deleted in Notion. It runs on its own at least once a day.
+          </p>
+          <div className="actions">
+            <button
+              type="button"
+              className="button"
+              disabled={sync.load.sync.running?.kind === "full"}
+              onClick={() => {
+                sync.start("full");
+              }}
+            >
+              {sync.load.sync.running?.kind === "full" ? "Full sync running…" : "Run full sync"}
+            </button>
+            {sync.load.sync.running && sync.load.sync.running.kind !== "full" && (
+              <span className="small muted">Runs after the current sync.</span>
+            )}
+          </div>
+          {sync.startProblem && <p className="field-error">{sync.startProblem.message}</p>}
+        </section>
+      )}
 
       <section className="panel" aria-labelledby="settings-advanced">
         <h2 id="settings-advanced" tabIndex={focusAdvanced ? -1 : undefined}>

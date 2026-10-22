@@ -491,6 +491,9 @@ def test_reader_has_no_write_methods() -> None:
         "retrieve_database",
         "retrieve_data_source",
         "query_data_source",
+        "retrieve_property_item",
+        "server_time",
+        "forget_server_time",
         "close",
     }
 

@@ -23,6 +23,7 @@ from typing import Any, Final, Literal, TypedDict
 
 import httpx
 
+from app.db.connection import lock_for
 from app.db.settings import (
     CONNECTION_KEYS,
     FULL_SYNC_REQUIRED_KEY,
@@ -408,7 +409,7 @@ class ConnectionService:
         keys = list(CONNECTION_KEYS)
         if clear_local_data:
             keys += list(SOURCE_DATA_KEYS)
-            with self._db:
+            with lock_for(self._db), self._db:
                 self._db.execute("DELETE FROM work_logs")
         self._settings.delete(keys)
         self._titles.clear()
@@ -482,7 +483,8 @@ class ConnectionService:
             raise AppError("That data source doesn't belong to the chosen database.")
         previous = self._settings.get_str("data_source_id")
         if previous and previous != data_source_id and confirm_replace is not True:
-            count = self._db.execute("SELECT COUNT(*) FROM work_logs").fetchone()[0]
+            with lock_for(self._db):
+                count = self._db.execute("SELECT COUNT(*) FROM work_logs").fetchone()[0]
             if count:
                 old = self._settings.get_str("database_title") or "the previous database"
                 raise ConfirmationRequiredError(
@@ -498,7 +500,7 @@ class ConnectionService:
             "database_title": title,
         }
         if previous and previous != data_source_id:
-            with self._db:
+            with lock_for(self._db), self._db:
                 self._db.execute("DELETE FROM work_logs")
             values.update(dict.fromkeys(k for k in SOURCE_DATA_KEYS if k not in SOURCE_KEYS))
         self._settings.set_many(values)
