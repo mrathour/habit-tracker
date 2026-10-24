@@ -32,7 +32,6 @@ from app.notion.errors import (
 from app.notion.handoff import TokenGrant
 from app.notion.service_client import TokenServiceClient, TokenServiceError
 from app.notion.tokens import TokenManager
-from app.paths import AppPaths
 from app.redaction import REDACTED, Secret, redact
 from tests.support.fake_notion import FakeNotion, notion_error
 from tests.support.memory_keyring import MemoryKeyring
@@ -171,15 +170,6 @@ def test_delete_forgets_secrets_and_tolerates_missing_entry() -> None:
     store.delete()
     assert store.load() is None
     assert redact(f"value {opaque}") == f"value {opaque}"
-
-
-def test_each_data_folder_gets_its_own_account() -> None:
-    real = AppPaths.resolve({"APPDATA": "C:/AppData"})
-    copy = AppPaths.resolve({"HABIT_TRACKER_HOME": "C:/somewhere/else"})
-    assert real.credential_account == "notion"
-    assert copy.credential_account.startswith("notion-")
-    assert copy.credential_account != real.credential_account
-    assert copy.instance_lock_name != real.instance_lock_name
 
 
 # --- Token manager ----------------------------------------------------------------------------

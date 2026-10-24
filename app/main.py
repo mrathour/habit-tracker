@@ -191,7 +191,7 @@ def build_services(
     settings."""
     service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
     notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
-    tokens = TokenManager(CredentialStore(paths.credential_account), service)
+    tokens = TokenManager(CredentialStore.for_paths(paths), service)
     settings = Settings(database.connection)
 
     def make_reader(manager: TokenManager) -> NotionReader:
