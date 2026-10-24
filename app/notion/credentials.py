@@ -1,8 +1,16 @@
 """The stored Notion connection, in Windows Credential Manager via ``keyring`` (PLAN.md 12.5).
 
 One entry: service ``HabitTracker``, account ``notion``. A copy of the app pointed at another
-data folder (``HABIT_TRACKER_HOME``) uses its own account, so tests and throwaway copies never
-touch the real connection.
+data folder (``HABIT_TRACKER_HOME``) uses its own service, ``HabitTracker-<instance id>``, so
+tests and throwaway copies never touch the real connection.
+
+A separate service, not just a separate account, because keyring's Windows backend names each
+Credential Manager entry after the service alone: two accounts of one service share the target
+``HabitTracker``, and each save moves the other account's entry to ``<account>@HabitTracker``.
+Copies made before this used the account ``notion-<instance id>`` of the real service. A copy
+moves such an entry to its own service the first time it reads it, and deletes it on logout.
+The real app's entry is unchanged; keyring still finds it if a copy moved it to
+``notion@HabitTracker``.
 
 The entry is a small JSON blob, ``{v, kind, access_token, refresh_token?, bot_id?,
 obtained_at}``, kept well under Credential Manager's 2,560-byte limit. Tokens never go anywhere
@@ -13,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, Literal, Protocol
@@ -21,6 +30,7 @@ import keyring
 import keyring.errors
 
 from app.notion.errors import CredentialStoreError
+from app.paths import AppPaths
 from app.redaction import Secret, forget_secret
 
 logger = logging.getLogger(__name__)
@@ -95,12 +105,33 @@ class CredentialBackend(Protocol):
 
 
 class CredentialStore:
-    def __init__(self, account: str = DEFAULT_ACCOUNT) -> None:
+    def __init__(
+        self,
+        account: str = DEFAULT_ACCOUNT,
+        *,
+        service: str = SERVICE_NAME,
+        legacy_account: str | None = None,
+    ) -> None:
         self.account = account
+        self.service = service
+        #: A copy's account under the real service, from before copies had their own service.
+        self.legacy_account = legacy_account
+
+    @classmethod
+    def for_paths(cls, paths: AppPaths) -> CredentialStore:
+        """The entry for this data folder: the real one, or a copy's own."""
+        if not paths.instance_id:
+            return cls()
+        return cls(
+            service=f"{SERVICE_NAME}-{paths.instance_id}",
+            legacy_account=f"{DEFAULT_ACCOUNT}-{paths.instance_id}",
+        )
 
     def load(self) -> StoredCredential | None:
         try:
-            text = keyring.get_password(SERVICE_NAME, self.account)
+            text = keyring.get_password(self.service, self.account)
+            if text is None and self.legacy_account is not None:
+                text = self._adopt_legacy_entry(self.legacy_account)
         except keyring.errors.KeyringError as exc:
             raise CredentialStoreError("read", detail=type(exc).__name__) from exc
         if text is None:
@@ -119,17 +150,20 @@ class CredentialStore:
                 "save", detail=f"The connection is {len(blob)} characters; the limit is 1280."
             )
         try:
-            keyring.set_password(SERVICE_NAME, self.account, blob)
+            keyring.set_password(self.service, self.account, blob)
         except keyring.errors.KeyringError as exc:
             raise CredentialStoreError("save", detail=type(exc).__name__) from exc
         logger.info("Saved the Notion connection (%s) to Credential Manager", credential.kind)
 
     def delete(self) -> None:
         existing = self.load()
+        locations = [(self.service, self.account)]
+        if self.legacy_account is not None:
+            locations.append((SERVICE_NAME, self.legacy_account))
         try:
-            keyring.delete_password(SERVICE_NAME, self.account)
-        except keyring.errors.PasswordDeleteError:
-            pass  # nothing stored
+            for service, account in locations:
+                with suppress(keyring.errors.PasswordDeleteError):  # nothing stored there
+                    keyring.delete_password(service, account)
         except keyring.errors.KeyringError as exc:
             raise CredentialStoreError("delete", detail=type(exc).__name__) from exc
         if existing is not None:
@@ -137,3 +171,17 @@ class CredentialStore:
             if existing.refresh_token is not None:
                 forget_secret(existing.refresh_token.reveal())
         logger.info("Deleted the Notion connection from Credential Manager")
+
+    def _adopt_legacy_entry(self, legacy_account: str) -> str | None:
+        """Move a copy's entry from the real service's target to this copy's own."""
+        text = keyring.get_password(SERVICE_NAME, legacy_account)
+        if text is None:
+            return None
+        keyring.set_password(self.service, self.account, text)
+        try:
+            keyring.delete_password(SERVICE_NAME, legacy_account)
+        except keyring.errors.KeyringError as exc:
+            # The copy now reads its own entry; logout deletes the old one again.
+            logger.warning("Couldn't remove this copy's old Credential Manager entry: %s", exc)
+        logger.info("Moved this copy's Notion connection to its own Credential Manager entry")
+        return text

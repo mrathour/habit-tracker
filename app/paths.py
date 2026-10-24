@@ -24,7 +24,8 @@ HOME_ENV_VAR = "HABIT_TRACKER_HOME"
 class AppPaths:
     root: Path
     #: Empty for the real data folder. For an overridden folder, a short hash of its path, so
-    #: that copy gets its own Credential Manager entry and single-instance lock.
+    #: that copy gets its own Credential Manager entry (``CredentialStore.for_paths``) and
+    #: single-instance lock.
     instance_id: str = ""
 
     @property
@@ -34,10 +35,6 @@ class AppPaths:
     @property
     def logs_dir(self) -> Path:
         return self.root / LOG_DIR_NAME
-
-    @property
-    def credential_account(self) -> str:
-        return f"notion-{self.instance_id}" if self.instance_id else "notion"
 
     @property
     def instance_lock_name(self) -> str:
