@@ -42,6 +42,7 @@ const STATUS_LABELS: Record<FieldStatus, { text: string; tone: "ok" | "warn" | "
   removed: { text: "Column removed in Notion", tone: "error" },
   type_changed: { text: "Column type changed", tone: "error" },
   unused: { text: "Not used", tone: "" },
+  new_column: { text: "New column", tone: "ok" },
 };
 
 /**
@@ -341,6 +342,7 @@ function MappingForm({
                   : undefined
               }
               rowsSampled={review.rows_sampled}
+              onCheckAgain={onRetry}
               onChange={(value) => {
                 onChange(field.key, value);
               }}
@@ -442,6 +444,7 @@ function FieldRow({
   labels,
   renamedFrom,
   rowsSampled,
+  onCheckAgain,
   onChange,
 }: {
   field: FieldReview;
@@ -453,6 +456,8 @@ function FieldRow({
   labels: Map<FieldKey, string>;
   renamedFrom: string | undefined;
   rowsSampled: number;
+  /** Read the columns again, after sharing the linked database in Notion. */
+  onCheckAgain: () => void;
   onChange: (value: string) => void;
 }) {
   const id = `field-${field.key}`;
@@ -544,6 +549,17 @@ function FieldRow({
 
       {!decided && field.message && (
         <p className={`field-note ${field.required ? "error" : "warn"}`}>{field.message}</p>
+      )}
+      {!value && field.share_help && (
+        <div className="notice warn" role="note">
+          <strong>Share the linked database to use {field.label.toLowerCase()}</strong>
+          <p>{field.share_help}</p>
+          <div className="actions">
+            <button type="button" className="button" onClick={onCheckAgain}>
+              Check again
+            </button>
+          </div>
+        </div>
       )}
       {field.required && !value && field.missing_help && (
         <div className="notice error" role="note">

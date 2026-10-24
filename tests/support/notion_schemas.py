@@ -26,6 +26,7 @@ WORK_LOG_IDS = {
 
 TASK_TRACKER_DS = "520e0461-ff97-4231-8a49-9cad4558add1"
 TASK_PAGE = "3fc15553-ce3d-8013-8a43-cb18275fee9b"
+SECOND_TASK = "3fc15553-ce3d-8013-8a43-000000000002"
 
 _CONFIG: dict[str, Any] = {
     "number": {"format": "number"},
@@ -81,6 +82,83 @@ def work_log_schema(renamed: dict[str, str] | None = None) -> Schema:
     return schema(
         *(prop(names.get(name, name), WORK_LOG_IDS[name], kind) for name, kind in types.items())
     )
+
+
+#: The real Work Log's property IDs (issue #12): the five the saved mapping recorded through
+#: Notion API 2026-03-11, Parent Task's from Notion's own schema view, and a placeholder for the
+#: button, whose ID was never read.
+REAL_WORK_LOG_IDS = {
+    "Name": "title",
+    "Start Time": "im%5BT",
+    "End Time": "AcSz",
+    "MinuteSpent": "JUjM",
+    "Parent Task": "fmJaXg",
+    "ID": "e%60~e",
+    "Fix Start Time": "btn1",
+}
+
+
+def real_work_log_schema() -> Schema:
+    """The author's Work Log as checked in Notion on 2026-10-24, sanitised: the same columns,
+    types and property IDs, with a placeholder Task Tracker database ID. Unlike
+    :func:`work_log_schema` it has the "Fix Start Time" button, and "Parent Task" is a one-way
+    relation limited to one page."""
+    types = {
+        "End Time": "date",
+        "Fix Start Time": "button",
+        "MinuteSpent": "number",
+        "Name": "title",
+        "Parent Task": "relation",
+        "Start Time": "date",
+        "ID": "unique_id",
+    }
+    return schema(*(prop(name, REAL_WORK_LOG_IDS[name], kind) for name, kind in types.items()))
+
+
+def real_work_log_rows() -> list[dict[str, Any]]:
+    """Two sessions on 23 October (local time), one linked to two tasks."""
+    source = real_work_log_schema()
+    return [
+        page(
+            source,
+            {
+                "Name": rich("Map the columns"),
+                "Start Time": when("2026-10-23T09:00:00.000+05:30"),
+                "End Time": when("2026-10-23T10:30:00.000+05:30"),
+                "MinuteSpent": 90,
+                "Parent Task": [{"id": TASK_PAGE}],
+                "ID": {"prefix": None, "number": 41},
+            },
+            created="2026-10-23T03:30:00.000Z",
+            page_id="3fc15553-ce3d-80e1-0000-000000000041",
+        ),
+        page(
+            source,
+            {
+                "Name": rich(""),
+                "Start Time": when("2026-10-23T11:00:00.000+05:30"),
+                "End Time": when("2026-10-23T11:45:00.000+05:30"),
+                "MinuteSpent": 45,
+                "Parent Task": [{"id": TASK_PAGE}, {"id": SECOND_TASK}],
+                "ID": {"prefix": None, "number": 42},
+            },
+            created="2026-10-23T05:30:00.000Z",
+            page_id="3fc15553-ce3d-80e1-0000-000000000042",
+        ),
+    ]
+
+
+def add_task_tracker(notion: FakeNotion, *, shared: bool) -> FakeDatabase:
+    """The Task Tracker that "Parent Task" links to, with the ID its relation names."""
+    database = notion.add_database("Task Tracker")
+    source = notion.data_sources.pop(database.data_source_ids[0])
+    source.id = TASK_TRACKER_DS
+    source.properties = schema(prop("Name", "title", "title"))
+    notion.data_sources[TASK_TRACKER_DS] = source
+    database.data_source_ids = [TASK_TRACKER_DS]
+    if not shared:
+        notion.unshared.add(database.id)
+    return database
 
 
 def without(source: Schema, *names: str) -> Schema:

@@ -101,6 +101,7 @@
         ],
         "required": true,
         "selection": null,
+        "share_help": null,
         "status": "choose"
       },
       {
@@ -138,6 +139,7 @@
         ],
         "required": true,
         "selection": null,
+        "share_help": null,
         "status": "choose"
       },
       {
@@ -159,6 +161,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -186,6 +189,7 @@
         ],
         "required": false,
         "selection": null,
+        "share_help": null,
         "status": "choose"
       },
       {
@@ -199,6 +203,7 @@
         "options": [],
         "required": false,
         "selection": null,
+        "share_help": null,
         "status": "unused"
       },
       {
@@ -212,10 +217,12 @@
         "options": [],
         "required": false,
         "selection": null,
+        "share_help": null,
         "status": "unused"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 0,
     "sample_limit": 25,
     "saved": false,
@@ -319,6 +326,7 @@
           "part": "start",
           "property_id": "%3DjVp"
         },
+        "share_help": null,
         "status": "saved"
       },
       {
@@ -343,6 +351,7 @@
         ],
         "required": true,
         "selection": null,
+        "share_help": null,
         "status": "removed"
       },
       {
@@ -364,6 +373,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "saved"
       },
       {
@@ -385,6 +395,7 @@
         "selection": {
           "property_id": "fmJa"
         },
+        "share_help": null,
         "status": "saved"
       },
       {
@@ -411,6 +422,7 @@
         "selection": {
           "property_id": "%7BmH%40"
         },
+        "share_help": null,
         "status": "saved"
       },
       {
@@ -432,10 +444,12 @@
         "selection": {
           "property_id": "ZCx%3F"
         },
+        "share_help": null,
         "status": "saved"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 0,
     "sample_limit": 25,
     "saved": true,
@@ -457,6 +471,7 @@
           "property_id": "%3DjVp"
         }
       ],
+      "suggestions": [],
       "warnings": [
         {
           "code": "extra_missing",
@@ -583,6 +598,7 @@
           "part": "start",
           "property_id": "%3DjVp"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -620,6 +636,7 @@
           "part": "start",
           "property_id": "Q%5Ckh"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -641,6 +658,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -662,6 +680,7 @@
         "selection": {
           "property_id": "fmJa"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -688,6 +707,7 @@
         "selection": {
           "property_id": "%7BmH%40"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -709,15 +729,692 @@
         "selection": {
           "property_id": "ZCx%3F"
         },
+        "share_help": null,
         "status": "auto"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 0,
     "sample_limit": 25,
     "saved": false,
     "saved_at": null,
     "schema_check": null
+  },
+  "hiddenParent": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "AcSz",
+        "name": "End Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T06:15:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T05:00:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "btn1",
+        "name": "Fix Start Time",
+        "note": null,
+        "readable": false,
+        "reason": "Buttons run actions in Notion and hold no value, so there's nothing to read.",
+        "samples": [],
+        "type": "button",
+        "type_label": "Button"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "JUjM",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "45"
+          },
+          {
+            "kind": "text",
+            "text": "90"
+          }
+        ],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 1,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Map the columns"
+          }
+        ],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "im%5BT",
+        "name": "Start Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T05:30:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T03:30:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "e%60~e",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "42"
+          },
+          {
+            "kind": "text",
+            "text": "41"
+          }
+        ],
+        "type": "unique_id",
+        "type_label": "ID"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "im%5BT"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "im%5BT"
+        },
+        "share_help": null,
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "im%5BT"
+          },
+          {
+            "label": "End of the date range in “End Time”",
+            "part": "end",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "End of the date range in “Start Time”",
+            "part": "end",
+            "property_id": "im%5BT"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "AcSz"
+        },
+        "share_help": null,
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "share_help": null,
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": null,
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [],
+        "required": false,
+        "selection": null,
+        "share_help": "Notion is hiding the relation column “Parent Task” because the database it links to isn't shared with Habit Tracker. In Notion, open that database, choose ••• → Connections, and add Habit Tracker. Then click “Check again”.",
+        "status": "unused"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "JUjM"
+          },
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "e%60~e"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "e%60~e"
+        },
+        "share_help": null,
+        "status": "auto"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "JUjM"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "JUjM"
+        },
+        "share_help": null,
+        "status": "auto"
+      }
+    ],
+    "full_sync_required": null,
+    "hidden_columns": [
+      {
+        "name": "Parent Task",
+        "type": "relation",
+        "type_label": "Relation"
+      }
+    ],
+    "rows_sampled": 2,
+    "sample_limit": 25,
+    "saved": false,
+    "saved_at": null,
+    "schema_check": null
+  },
+  "newParent": {
+    "columns": [
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "AcSz",
+        "name": "End Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T06:15:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T05:00:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 0,
+        "formula_types": [],
+        "has_range": false,
+        "id": "btn1",
+        "name": "Fix Start Time",
+        "note": null,
+        "readable": false,
+        "reason": "Buttons run actions in Notion and hold no value, so there's nothing to read.",
+        "samples": [],
+        "type": "button",
+        "type_label": "Button"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "JUjM",
+        "name": "MinuteSpent",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "45"
+          },
+          {
+            "kind": "text",
+            "text": "90"
+          }
+        ],
+        "type": "number",
+        "type_label": "Number"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 1,
+        "formula_types": [],
+        "has_range": false,
+        "id": "title",
+        "name": "Name",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "Map the columns"
+          }
+        ],
+        "type": "title",
+        "type_label": "Title"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "fmJaXg",
+        "name": "Parent Task",
+        "note": "Linked pages are kept as links; their titles aren't read.",
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "2 linked pages"
+          },
+          {
+            "kind": "text",
+            "text": "1 linked page"
+          }
+        ],
+        "type": "relation",
+        "type_label": "Relation"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "im%5BT",
+        "name": "Start Time",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T05:30:00.000Z"
+            }
+          },
+          {
+            "end": null,
+            "kind": "date",
+            "start": {
+              "date": "2026-10-23",
+              "has_time": true,
+              "utc": "2026-10-23T03:30:00.000Z"
+            }
+          }
+        ],
+        "type": "date",
+        "type_label": "Date"
+      },
+      {
+        "dates_without_time": 0,
+        "filled": 2,
+        "formula_types": [],
+        "has_range": false,
+        "id": "e%60~e",
+        "name": "ID",
+        "note": null,
+        "readable": true,
+        "reason": null,
+        "samples": [
+          {
+            "kind": "text",
+            "text": "42"
+          },
+          {
+            "kind": "text",
+            "text": "41"
+          }
+        ],
+        "type": "unique_id",
+        "type_label": "ID"
+      }
+    ],
+    "data_source_id": "ds-1",
+    "database_title": "Work Log",
+    "extra": [],
+    "fields": [
+      {
+        "choose_from": [],
+        "description": "When each work session starts. The date needs a time.",
+        "key": "start",
+        "label": "Start time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "im%5BT"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "im%5BT"
+        },
+        "share_help": null,
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "When each work session ends. The date needs a time.",
+        "key": "end",
+        "label": "End time",
+        "message": null,
+        "missing_help": null,
+        "needs": "Date",
+        "options": [
+          {
+            "label": "End Time",
+            "part": "start",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "Start Time",
+            "part": "start",
+            "property_id": "im%5BT"
+          },
+          {
+            "label": "End of the date range in “End Time”",
+            "part": "end",
+            "property_id": "AcSz"
+          },
+          {
+            "label": "End of the date range in “Start Time”",
+            "part": "end",
+            "property_id": "im%5BT"
+          }
+        ],
+        "required": true,
+        "selection": {
+          "part": "start",
+          "property_id": "AcSz"
+        },
+        "share_help": null,
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "What you worked on. Blank names show as \"Untitled\" and are never flagged.",
+        "key": "task_name",
+        "label": "Task name",
+        "message": null,
+        "missing_help": null,
+        "needs": "Title or Text",
+        "options": [
+          {
+            "label": "Name",
+            "part": null,
+            "property_id": "title"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "title"
+        },
+        "share_help": null,
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "The task each session belongs to, shown as a link to it in Notion.",
+        "key": "parent_task",
+        "label": "Parent task link",
+        "message": "“Parent Task” appeared in Notion after you saved the mapping, so it's selected for Parent task link. Save the mapping to start using it, or choose “Not used”.",
+        "missing_help": null,
+        "needs": "Relation",
+        "options": [
+          {
+            "label": "Parent Task",
+            "part": null,
+            "property_id": "fmJaXg"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "fmJaXg"
+        },
+        "share_help": null,
+        "status": "new_column"
+      },
+      {
+        "choose_from": [],
+        "description": "A short label for each entry in the raw log.",
+        "key": "display_id",
+        "label": "Display ID",
+        "message": null,
+        "missing_help": null,
+        "needs": "ID or Number",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "JUjM"
+          },
+          {
+            "label": "ID",
+            "part": null,
+            "property_id": "e%60~e"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "e%60~e"
+        },
+        "share_help": null,
+        "status": "saved"
+      },
+      {
+        "choose_from": [],
+        "description": "Minutes you logged by hand. Used only to check entries: durations always come from End minus Start.",
+        "key": "logged_minutes",
+        "label": "Logged minutes",
+        "message": null,
+        "missing_help": null,
+        "needs": "Number or Formula",
+        "options": [
+          {
+            "label": "MinuteSpent",
+            "part": null,
+            "property_id": "JUjM"
+          }
+        ],
+        "required": false,
+        "selection": {
+          "property_id": "JUjM"
+        },
+        "share_help": null,
+        "status": "saved"
+      }
+    ],
+    "full_sync_required": null,
+    "hidden_columns": [],
+    "rows_sampled": 2,
+    "sample_limit": 25,
+    "saved": true,
+    "saved_at": "2026-10-22T10:00:00.000Z",
+    "schema_check": {
+      "blocking": [],
+      "ok": true,
+      "renamed": [],
+      "suggestions": [
+        {
+          "column_name": "Parent Task",
+          "field": "parent_task",
+          "field_label": "Parent task link",
+          "message": "Notion now shows the Relation column “Parent Task”, which fits Parent task link. Review the column mapping to use it.",
+          "property_id": "fmJaXg"
+        }
+      ],
+      "warnings": []
+    }
   },
   "noEnd": {
     "columns": [
@@ -892,6 +1589,7 @@
           "part": "start",
           "property_id": "%3DjVp"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -916,6 +1614,7 @@
         ],
         "required": true,
         "selection": null,
+        "share_help": null,
         "status": "missing"
       },
       {
@@ -937,6 +1636,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -958,6 +1658,7 @@
         "selection": {
           "property_id": "fmJa"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -984,6 +1685,7 @@
         "selection": {
           "property_id": "%7BmH%40"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1005,10 +1707,12 @@
         "selection": {
           "property_id": "ZCx%3F"
         },
+        "share_help": null,
         "status": "auto"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 3,
     "sample_limit": 25,
     "saved": false,
@@ -1098,6 +1802,7 @@
           "part": "start",
           "property_id": "s%3A1"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1125,6 +1830,7 @@
           "part": "end",
           "property_id": "s%3A1"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1146,6 +1852,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1159,6 +1866,7 @@
         "options": [],
         "required": false,
         "selection": null,
+        "share_help": "Habit Tracker can't see a relation column in this database. If your sessions link to tasks in another database, such as a task tracker, Notion hides that column until the other database is shared with Habit Tracker too. In Notion, open that database, choose ••• → Connections, and add Habit Tracker. Then click “Check again”.",
         "status": "unused"
       },
       {
@@ -1172,6 +1880,7 @@
         "options": [],
         "required": false,
         "selection": null,
+        "share_help": null,
         "status": "unused"
       },
       {
@@ -1185,10 +1894,12 @@
         "options": [],
         "required": false,
         "selection": null,
+        "share_help": null,
         "status": "unused"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 2,
     "sample_limit": 25,
     "saved": false,
@@ -1462,6 +2173,7 @@
           "part": "start",
           "property_id": "%3DjVp"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1499,6 +2211,7 @@
           "part": "start",
           "property_id": "Q%5Ckh"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1520,6 +2233,7 @@
         "selection": {
           "property_id": "title"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1541,6 +2255,7 @@
         "selection": {
           "property_id": "fmJa"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1567,6 +2282,7 @@
         "selection": {
           "property_id": "%7BmH%40"
         },
+        "share_help": null,
         "status": "auto"
       },
       {
@@ -1588,10 +2304,12 @@
         "selection": {
           "property_id": "ZCx%3F"
         },
+        "share_help": null,
         "status": "auto"
       }
     ],
     "full_sync_required": null,
+    "hidden_columns": [],
     "rows_sampled": 3,
     "sample_limit": 25,
     "saved": false,

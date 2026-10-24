@@ -23,10 +23,11 @@ import { rawLogPage } from "./rawLogFixtures";
 /**
  * Mapping reviews made by the real Python service (tests/support/ui_fixtures.py): the Work
  * Log, no end-time column, a single date-range column, ambiguous columns, an empty database,
- * and a saved mapping whose columns then changed in Notion.
+ * a saved mapping whose columns then changed in Notion, and the real Work Log with its Task
+ * Tracker not shared (hiddenParent) or shared after saving (newParent, issue #12).
  */
 export const reviews = fixtures as unknown as Record<
-  "workLog" | "noEnd" | "range" | "ambiguous" | "empty" | "changed",
+  "workLog" | "noEnd" | "range" | "ambiguous" | "empty" | "changed" | "hiddenParent" | "newParent",
   MappingReview
 >;
 
@@ -113,6 +114,7 @@ export const neverSynced: SyncStatus = {
   flagged: 0,
   pending_removal: null,
   full_sync_required: false,
+  mapping_suggestions: [],
 };
 
 export const fullSyncDone: SyncResult = {
@@ -276,6 +278,8 @@ export const dayDetail: DayDetail = {
       overlap_minutes: 30,
       overlaps_with: [{ page_id: "p2", label: "#2 Review" }],
       url: "https://www.notion.so/p1",
+      parent_task_ids: ["task-1"],
+      parent_urls: ["https://www.notion.so/task1"],
     },
     {
       page_id: "p2",
@@ -289,6 +293,8 @@ export const dayDetail: DayDetail = {
       overlap_minutes: 30,
       overlaps_with: [{ page_id: "p1", label: "#1 Write" }],
       url: "https://www.notion.so/p2",
+      parent_task_ids: ["task-1", "task-2"],
+      parent_urls: ["https://www.notion.so/task1", "https://www.notion.so/task2"],
     },
     {
       page_id: "p3",
@@ -302,6 +308,8 @@ export const dayDetail: DayDetail = {
       overlap_minutes: 0,
       overlaps_with: [],
       url: "https://www.notion.so/p3",
+      parent_task_ids: [],
+      parent_urls: [],
     },
   ],
 };
@@ -351,6 +359,7 @@ export function installFakeBridge(overrides: Partial<PythonApi> = {}) {
     save_mapping: vi.fn<PythonApi["save_mapping"]>(() =>
       ok({ changed: false, full_sync_required: null }),
     ),
+    dismiss_mapping_suggestion: vi.fn<PythonApi["dismiss_mapping_suggestion"]>(() => ok([])),
     get_sync_status: vi.fn<PythonApi["get_sync_status"]>(() => ok(neverSynced)),
     start_sync: vi.fn<PythonApi["start_sync"]>(() => ok(neverSynced)),
     get_flagged_entries: vi.fn<PythonApi["get_flagged_entries"]>(() =>

@@ -85,6 +85,10 @@ class DetailSession(TypedDict):
     overlap_minutes: float
     overlaps_with: list[OverlapWith]
     url: str
+    #: Every page linked in the parent task relation, in Notion's order; the first is the
+    #: parent task (PLAN.md 4.1). Empty when nothing is linked or the field is "Not used".
+    parent_task_ids: list[str]
+    parent_urls: list[str]
 
 
 class DayDetail(TypedDict):
@@ -170,9 +174,11 @@ class StatsService:
         days = allocate(sessions, zone, prefs["midnight_rule"], prefs["overlap_rule"])
         entry = days.get(key)
         by_id = {s.page_id: s for s in sessions}
+        parents = self._parent_links(list(entry.sessions) if entry else [])
         rows: list[DetailSession] = []
         for page_id, counted in entry.sessions.items() if entry else []:
             session = by_id[page_id]
+            parent_ids = parents.get(page_id, [])
             overlapped, others = overlap_minutes(session, sessions)
             start_local = session.start.astimezone(zone).date()
             end_local = (session.end - timedelta(microseconds=1)).astimezone(zone).date()
@@ -192,6 +198,8 @@ class StatsService:
                         for other in others
                     ],
                     "url": notion_url(page_id),
+                    "parent_task_ids": parent_ids,
+                    "parent_urls": [notion_url(parent) for parent in parent_ids],
                 }
             )
         rows.sort(key=lambda row: (row["start_utc"], row["end_utc"], row["page_id"]))
@@ -204,6 +212,27 @@ class StatsService:
         }
 
     # --- data --------------------------------------------------------------------------------
+
+    def _parent_links(self, page_ids: list[str]) -> dict[str, list[str]]:
+        """Each entry's linked parent pages, by entry page ID."""
+        if not page_ids:
+            return {}
+        marks = ",".join("?" * len(page_ids))
+        with lock_for(self._db):
+            rows = self._db.execute(
+                f"SELECT page_id, parent_task_ids FROM work_logs WHERE page_id IN ({marks})",  # noqa: S608 - only placeholders
+                page_ids,
+            ).fetchall()
+        links: dict[str, list[str]] = {}
+        for page_id, raw in rows:
+            try:
+                value = json.loads(raw) if raw else []
+            except ValueError:
+                value = []
+            links[page_id] = (
+                [str(p) for p in value if isinstance(p, str)] if isinstance(value, list) else []
+            )
+        return links
 
     def _load(self) -> tuple[list[Session], tuple[int, int, int]]:
         """Sessions that count, and (entries, excluded, flagged)."""

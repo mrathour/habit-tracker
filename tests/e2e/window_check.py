@@ -23,6 +23,9 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
   save the fake Notion and keyring to the data folder;
 * ``rawlog``: sync the broken entries, open the raw log from the dashboard's flagged count, and
   read every red cell and its explanation, selecting and opening a row, and a CSV export;
+* ``parent-task``: the real Work Log with its Task Tracker unshared: the mapping explains how to
+  share it; once shared, Check again maps Parent Task, and the raw log and the day detail open
+  the linked tasks (issue #12);
 * ``sync-relaunch``: a second launch on that folder: Notion edits and a deletion are made first;
   the launch's quick sync picks up the edits, and a full sync from Settings removes the deleted
   entry.
@@ -61,9 +64,13 @@ from tests.support.fake_notion import FakeDatabase, FakeDataSource
 from tests.support.fake_notion_server import FakeNotionServer
 from tests.support.memory_keyring import MemoryKeyring
 from tests.support.notion_schemas import (
+    SECOND_TASK,
+    TASK_PAGE,
     add_source,
+    add_task_tracker,
     broken_rows,
     page,
+    real_work_log_schema,
     rich,
     when,
     without,
@@ -616,6 +623,106 @@ def rawlog(fake: FakeNotionServer, home: Path, opened: list[str]) -> Scenario:
     return scenario
 
 
+def parent_task_rows() -> list[dict[str, Any]]:
+    """Yesterday, in this computer's time zone: one session linked to a task, one to two."""
+    yesterday = datetime.now().astimezone().date() - timedelta(days=1)
+    source = real_work_log_schema()
+
+    def row(page_id: str, name: str, start: int, end: int, links: list[str]) -> dict[str, Any]:
+        return page(
+            source,
+            {
+                "Name": rich(name),
+                "Start Time": when(local_iso(yesterday, start)),
+                "End Time": when(local_iso(yesterday, end)),
+                "Parent Task": [{"id": link} for link in links],
+            },
+            created="2026-01-01T00:00:00.000Z",
+            page_id=page_id,
+        )
+
+    return [
+        row("parent-a", "Map the columns", 9, 10, [TASK_PAGE]),
+        row("parent-b", "Review", 11, 12, [TASK_PAGE, SECOND_TASK]),
+    ]
+
+
+def parent_task(fake: FakeNotionServer, tracker: FakeDatabase, opened: list[str]) -> Scenario:
+    """Issue #12: the Task Tracker starts unshared, so the mapping explains how to share it.
+    Sharing it and clicking Check again maps Parent Task; the sync keeps its links, and the raw
+    log and the day detail open the task in Notion."""
+
+    def wait_opened(count: int) -> None:
+        deadline = time.monotonic() + TIMEOUT_S
+        while len(opened) < count and time.monotonic() < deadline:
+            time.sleep(0.2)
+
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        paste_token(window, fake.notion.issue_token())
+        wait_for(window, heading_is("Choose your work log"))
+        wait_for(window, DATABASES_LOADED)
+        click_label(window, "Work Log")
+        click(window, "Use this database")
+        wait_for(window, MAPPING_LOADED)
+        parent_row = "document.querySelector('#field-parent_task').closest('li')"
+        results["share_help"] = window.evaluate_js(f"{parent_row}.innerText")
+        results["parent_before"] = selected(window, "#field-parent_task")
+        window.evaluate_js(f"{parent_row}.scrollIntoView({{ block: 'center' }})")
+        snap("parent-share-help")
+
+        with fake.notion.lock:
+            fake.notion.unshared.discard(tracker.id)  # the user shares it in Notion
+        click(window, "Check again", within=parent_row)
+        wait_for(
+            window,
+            "document.querySelector('#field-parent_task')?.selectedOptions[0]?.textContent"
+            " === 'Parent Task · Relation'",
+        )
+        results["parent_after"] = selected(window, "#field-parent_task")
+        results["share_help_after"] = window.evaluate_js(
+            f"{parent_row}.querySelector('.notice') !== null"
+        )
+        click(window, "Save mapping")
+        wait_for(window, heading_is("Work Log"))
+        wait_for_sync(window, "Full sync")
+
+        # The raw log's Parent task cell opens the task.
+        click(window, "Raw log", within="document.querySelector('nav')")
+        wait_for(window, heading_is("Raw log"))
+        wait_for(window, "document.querySelectorAll('tr[data-page-id]').length === 2")
+        cell = "tr[data-page-id='parent-a'] td[data-kind=parent_task]"
+        results["raw_cell"] = text(window, cell)
+        window.evaluate_js(f'document.querySelector("{cell} button").click()')
+        wait_opened(1)
+        results["opened_from_raw_log"] = list(opened)
+
+        # The day detail lists both links of the second session.
+        click(window, "Home", within="document.querySelector('nav')")
+        wait_for(window, "document.querySelector('.stat-row .stat:not(.skeleton)') !== null")
+        daily = "[aria-labelledby='daily-title']"
+        click_in(window, daily, "Show as table")
+        wait_for(window, f'document.querySelector("{daily} table") !== null')
+        window.evaluate_js(
+            f'[...document.querySelectorAll("{daily} tbody tr")]'
+            ".find((tr) => !tr.innerText.includes('\\t0 min')).querySelector('th button').click()"
+        )
+        wait_for(window, "document.querySelector('.day-detail') !== null")
+        results["detail"] = text(window, "[role=dialog]")
+        snap("parent-day-detail")
+        for label in (
+            "Open the parent task of Review in Notion",
+            "Open linked page 2 of Review in Notion",
+        ):
+            window.evaluate_js(
+                f"document.querySelector('[role=dialog] button[aria-label=\"{label}\"]').click()"
+            )
+        wait_opened(3)
+        results["opened"] = list(opened)
+
+    return scenario
+
+
 def edit_in_notion(fake: FakeNotionServer) -> None:
     """What the user does in Notion between the two launches."""
     notion = fake.notion
@@ -820,6 +927,20 @@ def main() -> int:
 
             webbrowser.open = record
             exit_code = open_window(rawlog(fake, paths.root, opened))
+    elif name == "parent-task":
+        with FakeNotionServer() as fake:
+            fake.notion.workspace_name = "E2E Workspace"
+            tracker = add_task_tracker(fake.notion, shared=False)
+            add_source(fake.notion, "Work Log", real_work_log_schema(), parent_task_rows())
+            os.environ[NOTION_URL_ENV_VAR] = fake.url
+            opened_pages: list[str] = []
+
+            def record_page(url: str, *_args: Any, **_kwargs: Any) -> bool:
+                opened_pages.append(url)
+                return True
+
+            webbrowser.open = record_page
+            exit_code = open_window(parent_task(fake, tracker, opened_pages))
     elif name == "mapping":
         with FakeNotionServer() as fake:
             seed_fake_notion(fake)

@@ -8,6 +8,9 @@
 * **Warnings** (the sync continues without that field): an optional field's or an extra field's
   column is gone or changed to a type it can't use.
 
+* **Suggestions** (never a problem): a column the mapping hasn't seen that fits an unused optional
+  field, such as a relation Notion shows once its database is shared (``app/mapping/suggest.py``).
+
 Problems in individual entries are validation's business and never appear here (PLAN.md 5).
 Columns are found by property ID, so a renamed column is not a problem; renames are reported
 separately so the screens can show the new names.
@@ -24,6 +27,7 @@ from app.mapping.fields import FIELDS, AppField
 from app.mapping.matcher import FieldRef, compatible
 from app.mapping.model import StoredMapping, parse_mapping
 from app.mapping.properties import Property, is_readable, schema_properties, type_label
+from app.mapping.suggest import Suggestion, SuggestionDict, suggestions
 
 SchemaIssueCode = Literal[
     "mapping_missing",
@@ -56,6 +60,7 @@ class SchemaCheckDict(TypedDict):
     blocking: list[SchemaIssueDict]
     warnings: list[SchemaIssueDict]
     renamed: list[RenameDict]
+    suggestions: list[SuggestionDict]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +86,7 @@ class SchemaCheck:
     warnings: list[SchemaIssue] = field(default_factory=list)
     #: Mapped columns whose names changed in Notion: (property ID, name at save, name now).
     renamed: list[tuple[str, str, str]] = field(default_factory=list)
+    suggestions: list[Suggestion] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -96,6 +102,7 @@ class SchemaCheck:
                 {"property_id": pid, "old_name": old, "new_name": new}
                 for pid, old, new in self.renamed
             ],
+            "suggestions": [suggestion.to_dict() for suggestion in self.suggestions],
         }
 
 
@@ -148,6 +155,7 @@ def check_schema(mapping: object, data_source: Mapping[str, Any]) -> SchemaCheck
         current = by_id.get(prop_id)
         if current is not None and current.name != old_name:
             result.renamed.append((prop_id, old_name, current.name))
+    result.suggestions.extend(suggestions(saved, props))
     return result
 
 

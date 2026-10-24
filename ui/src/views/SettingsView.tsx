@@ -12,6 +12,7 @@ import { TokenForm } from "../connection/TokenForm";
 import { noticeFromCallError } from "../errors/reporting";
 import { DashboardSettings } from "../dashboard/DashboardSettings";
 import { formatWhen } from "../sync/format";
+import { MappingSuggestions } from "../sync/MappingSuggestions";
 import type { SyncState } from "../sync/useSync";
 import { DisconnectDialog } from "./DisconnectDialog";
 
@@ -78,6 +79,7 @@ export function SettingsView({
                 </>
               )}
             </dl>
+            <MappingSuggestions sync={sync} onReviewMapping={onReviewMapping} />
             <div className="actions">
               <button type="button" className="button" onClick={onChangeDatabase}>
                 {info.database_title ? "Choose a different database" : "Choose your work log"}

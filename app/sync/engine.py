@@ -36,10 +36,16 @@ from pathlib import Path
 from typing import Any, Final, Literal, TypedDict
 
 from app.db.connection import connect, lock_for
-from app.db.settings import FULL_SYNC_REQUIRED_KEY, MAPPING_KEY, Settings
+from app.db.settings import (
+    FULL_SYNC_REQUIRED_KEY,
+    MAPPING_KEY,
+    MAPPING_SUGGESTIONS_KEY,
+    Settings,
+)
 from app.errors import AppError, report_exception
 from app.mapping.model import StoredMapping, parse_mapping
 from app.mapping.properties import schema_properties
+from app.mapping.suggest import SuggestionDict, stored_suggestions
 from app.notion.client import NotionReader
 from app.notion.dates import utc_iso
 from app.notion.errors import NotConnectedError
@@ -117,6 +123,8 @@ class SyncStatus(TypedDict):
     flagged: int
     pending_removal: PendingRemoval | None
     full_sync_required: bool
+    #: New columns that fit an unused optional field (issue #12).
+    mapping_suggestions: list[SuggestionDict]
 
 
 class FlaggedPage(TypedDict):
@@ -410,6 +418,7 @@ class SyncService:
             "error": None,
         }
         updates[LAST_SYNC_RESULT_KEY] = result
+        updates[MAPPING_SUGGESTIONS_KEY] = [s.to_dict() for s in check.suggestions] or None
         settings.set_many(updates)
         logger.info(
             "%s sync finished: %d added, %d updated, %d removed, %d flagged%s",
@@ -526,6 +535,7 @@ def _stored_status(conn: sqlite3.Connection, settings: Settings) -> SyncStatus:
             else None
         ),
         "full_sync_required": settings.get(FULL_SYNC_REQUIRED_KEY) is not None,
+        "mapping_suggestions": stored_suggestions(settings),
     }
 
 

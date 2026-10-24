@@ -28,8 +28,11 @@ from tests.support.fake_notion import FakeNotion
 from tests.support.notion_schemas import (
     Schema,
     add_source,
+    add_task_tracker,
     page,
     prop,
+    real_work_log_rows,
+    real_work_log_schema,
     rich,
     schema,
     when,
@@ -67,9 +70,18 @@ def _review(
     *,
     save_then: Schema | None = None,
     extra: list[str] | None = None,
+    tracker_shared: bool | None = None,
+    share_after_save: bool = False,
 ) -> dict[str, Any]:
-    """The review for a database; with ``save_then``, saved first and then the schema changed."""
+    """The review for a database; with ``save_then``, saved first and then the schema changed.
+
+    ``tracker_shared`` adds the Task Tracker that "Parent Task" links to, shared with the
+    connection or not; ``share_after_save`` saves the mapping, then shares it (issue #12).
+    """
     notion = FakeNotion()
+    tracker = (
+        add_task_tracker(notion, shared=tracker_shared) if tracker_shared is not None else None
+    )
     with tempfile.TemporaryDirectory() as folder:
         database = open_database(Path(folder) / "fixture.db")
         try:
@@ -108,6 +120,10 @@ def _review(
                 fields = {f["key"]: f["selection"] for f in review["fields"]}
                 service.save(fields, extra or [])
                 notion.data_sources[source_id].properties = save_then
+                review = service.review()
+            if share_after_save and tracker is not None:
+                service.save({f["key"]: f["selection"] for f in review["fields"]}, extra or [])
+                notion.unshared.discard(tracker.id)
                 review = service.review()
             # The fake gives data sources random IDs; pin it so the file is stable.
             return {**review, "data_source_id": "ds-1"}
@@ -158,6 +174,16 @@ def build() -> dict[str, Any]:
             [],
             save_then=changed,
             extra=["mood"],
+        ),
+        "hiddenParent": _review(
+            "Work Log", real_work_log_schema(), real_work_log_rows(), tracker_shared=False
+        ),
+        "newParent": _review(
+            "Work Log",
+            real_work_log_schema(),
+            real_work_log_rows(),
+            tracker_shared=False,
+            share_after_save=True,
         ),
     }
 

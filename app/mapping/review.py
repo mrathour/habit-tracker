@@ -7,7 +7,10 @@ and its 25 most recently created rows (one ``POST .../query``, a read), then ret
   values from those rows;
 * every app field, with the compatible columns it may use and its current selection: the saved
   mapping laid over today's columns, or on first setup the auto-matcher's suggestion;
-* for a saved mapping, the schema check (PLAN.md 6.3) and any renamed columns.
+* for a saved mapping, the schema check (PLAN.md 6.3) and any renamed columns;
+* columns the sample rows hold but the schema leaves out. Notion leaves a relation out of the
+  schema while the database it links to isn't shared with the connection (issue #12); Parent
+  task link then explains how to share it.
 
 :meth:`MappingService.save` checks the user's choice against a fresh copy of the schema and
 saves it. Changing a saved mapping sets ``full_sync_required``: existing entries need the new
@@ -21,7 +24,12 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Final, Literal, TypedDict
 
-from app.db.settings import FULL_SYNC_REQUIRED_KEY, MAPPING_KEY, Settings
+from app.db.settings import (
+    FULL_SYNC_REQUIRED_KEY,
+    MAPPING_KEY,
+    MAPPING_SUGGESTIONS_KEY,
+    Settings,
+)
 from app.errors import AppError
 from app.mapping.fields import FIELDS, AppField, DatePart, FieldKey
 from app.mapping.matcher import (
@@ -52,6 +60,7 @@ from app.mapping.properties import (
     type_label,
     unusable_reason,
 )
+from app.mapping.suggest import SuggestionDict, stored_suggestions
 from app.notion.client import NotionReader
 from app.notion.dates import utc_iso
 from app.notion.errors import NotConnectedError, NotionRequestError
@@ -65,7 +74,9 @@ SAMPLE_ROWS: Final = 25
 #: Sample values shown per column.
 SAMPLES_PER_COLUMN: Final = 3
 
-FieldStatus = Literal["auto", "saved", "choose", "missing", "removed", "type_changed", "unused"]
+FieldStatus = Literal[
+    "auto", "saved", "choose", "missing", "removed", "type_changed", "unused", "new_column"
+]
 
 
 class NoDatabaseError(AppError):
@@ -122,6 +133,14 @@ class FieldReview(TypedDict):
     message: str | None
     #: What a required field needs when the database has no column for it.
     missing_help: str | None
+    #: Parent task link with no relation column in sight: how to share the linked database.
+    share_help: str | None
+
+
+class HiddenColumn(TypedDict):
+    name: str
+    type: str
+    type_label: str
 
 
 class FullSyncFlag(TypedDict):
@@ -141,6 +160,8 @@ class MappingReview(TypedDict):
     sample_limit: int
     full_sync_required: FullSyncFlag | None
     schema_check: SchemaCheckDict | None
+    #: Columns in the sample rows that the schema leaves out (see the module docstring).
+    hidden_columns: list[HiddenColumn]
 
 
 class SaveResult(TypedDict):
@@ -173,6 +194,7 @@ class MappingService:
         props = schema_properties(source)
         rows = self._sample_rows(source_id)
         columns = [_column_info(prop, rows) for prop in props]
+        hidden = _hidden_columns(props, rows)
         evidence = {c["id"]: _evidence(c) for c in columns}
         stored = self._settings.get(MAPPING_KEY)
         saved = _parse_or_none(stored)
@@ -188,6 +210,7 @@ class MappingService:
             fields = _suggested_fields(match_columns(props, evidence), props, evidence)
             extra = []
         _add_missing_help(fields, props)
+        _add_share_help(fields, props, hidden)
         return {
             "data_source_id": source_id,
             "database_title": self._settings.get_str("database_title"),
@@ -200,6 +223,7 @@ class MappingService:
             "sample_limit": SAMPLE_ROWS,
             "full_sync_required": self.full_sync_flag(),
             "schema_check": check.to_dict() if check is not None else None,
+            "hidden_columns": hidden,
         }
 
     def full_sync_flag(self) -> FullSyncFlag | None:
@@ -226,7 +250,9 @@ class MappingService:
         flag = self.full_sync_flag()
         if changed and flag is None:
             flag = {"since": mapping["saved_at"], "reason": CHANGE_REASON}
-        self._settings.set_many({MAPPING_KEY: mapping, FULL_SYNC_REQUIRED_KEY: flag})
+        self._settings.set_many(
+            {MAPPING_KEY: mapping, FULL_SYNC_REQUIRED_KEY: flag, MAPPING_SUGGESTIONS_KEY: None}
+        )
         if not had_mapping:
             outcome = "first save"
         elif changed:
@@ -235,6 +261,26 @@ class MappingService:
             outcome = "unchanged"
         logger.info("Saved the column mapping (%s)", outcome)
         return {"changed": changed, "full_sync_required": flag}
+
+    def dismiss_suggestion(self, property_id: object) -> list[SuggestionDict]:
+        """Stop offering a new column: it joins ``known_columns``. Returns the offers left."""
+        if not isinstance(property_id, str) or not property_id:
+            raise AppError("That suggestion was sent in an unexpected form.")
+        saved = _parse_or_none(self._settings.get(MAPPING_KEY))
+        remaining = [
+            s for s in stored_suggestions(self._settings) if s["property_id"] != property_id
+        ]
+        updates: dict[str, object] = {MAPPING_SUGGESTIONS_KEY: remaining or None}
+        if saved is not None:
+            known = saved["known_columns"]
+            if known is None:
+                known = list(saved["names_at_save"])
+            if property_id not in known:
+                known = [*known, property_id]
+            updates[MAPPING_KEY] = {**saved, "known_columns": known}
+        self._settings.set_many(updates)
+        logger.info("Dismissed a new-column suggestion")
+        return remaining
 
     # --- plumbing -----------------------------------------------------------------------
 
@@ -389,6 +435,7 @@ def _review(
         "options": _options(app_field, props, evidence),
         "message": message,
         "missing_help": None,
+        "share_help": None,
     }
 
 
@@ -459,6 +506,16 @@ def _saved_fields(
             )
         else:
             reviews.append(_review(app_field, props, evidence, selection=ref, status="saved"))
+    for suggestion in check["suggestions"]:
+        review = next(r for r in reviews if r["key"] == suggestion["field"])
+        if review["selection"] is None and review["status"] == "unused":
+            review["selection"] = {"property_id": suggestion["property_id"]}
+            review["status"] = "new_column"
+            review["message"] = (
+                f"“{suggestion['column_name']}” appeared in Notion after you saved the mapping, "
+                f"so it's selected for {review['label']}. Save the mapping to start using it, or "
+                "choose “Not used”."
+            )
     _drop_orphaned_range_end(reviews)
     return reviews
 
@@ -511,6 +568,52 @@ def _add_missing_help(reviews: list[FieldReview], props: Sequence[Property]) -> 
                 f"“{column}” holds each session as a date range (start → end), choose “End of "
                 f"the date range in “{column}”” for End time."
             )
+
+
+def _hidden_columns(
+    props: Sequence[Property], rows: Sequence[Mapping[str, Any]]
+) -> list[HiddenColumn]:
+    """Columns the sample rows hold that the schema leaves out, in the rows' order."""
+    known = {p.id for p in props}
+    hidden: dict[str, HiddenColumn] = {}
+    for row in rows:
+        values = row.get("properties")
+        if not isinstance(values, dict):
+            continue
+        for name, value in values.items():
+            if not isinstance(value, dict):
+                continue
+            pid, kind = value.get("id"), value.get("type")
+            if isinstance(pid, str) and isinstance(kind, str) and pid not in known:
+                hidden.setdefault(
+                    pid, {"name": str(name), "type": kind, "type_label": type_label(kind)}
+                )
+    return list(hidden.values())
+
+
+def _add_share_help(
+    reviews: list[FieldReview], props: Sequence[Property], hidden: Sequence[HiddenColumn]
+) -> None:
+    """Parent task link can't be offered a relation Notion hides: say how to make it visible."""
+    if any(p.type == "relation" for p in props):
+        return
+    review = next(r for r in reviews if r["key"] == "parent_task")
+    steps = (
+        "In Notion, open that database, choose ••• → Connections, and add Habit Tracker. Then "
+        "click “Check again”."
+    )
+    names = [f"“{c['name']}”" for c in hidden if c["type"] == "relation"]
+    if names:
+        review["share_help"] = (
+            f"Notion is hiding the relation column {' and '.join(names)} because the database "
+            f"it links to isn't shared with Habit Tracker. {steps}"
+        )
+    else:
+        review["share_help"] = (
+            "Habit Tracker can't see a relation column in this database. If your sessions link "
+            "to tasks in another database, such as a task tracker, Notion hides that column "
+            f"until the other database is shared with Habit Tracker too. {steps}"
+        )
 
 
 def _parse_or_none(value: object) -> StoredMapping | None:

@@ -53,6 +53,15 @@ export function useSync(enabled: boolean) {
     setLoad({ status: "ready", sync });
   }, []);
 
+  /** Stop offering a new column (issue #12), then show the offers left. */
+  const dismissSuggestion = useCallback(
+    async (propertyId: string) => {
+      await callPython("dismiss_mapping_suggestion", propertyId);
+      refresh();
+    },
+    [refresh],
+  );
+
   // Not syncable (not connected, no work log or no mapping): nothing to show.
   return {
     load: enabled ? load : ({ status: "idle" } as const),
@@ -60,6 +69,7 @@ export function useSync(enabled: boolean) {
     startProblem,
     refresh,
     resolveRemoval,
+    dismissSuggestion,
   };
 }
 

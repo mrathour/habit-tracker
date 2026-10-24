@@ -1575,6 +1575,12 @@ a {
   margin: 0;
 }
 
+.detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
 .settings-grid {
   display: grid;
   gap: 18px;
