@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -271,3 +271,120 @@ def test_bridge_without_a_started_app(app_paths: AppPaths) -> None:
     api = Api(AppContext(mode="normal", paths=app_paths, database=None, events=EventChannel()))
     assert api.get_policy_notice()["ok"] is False
     assert api.get_app_info()["data"]["policy_version"] is None  # type: ignore[typeddict-item]
+
+
+# --- The real "connected before" check (issue #13) -----------------------------------------
+#
+# These go through ``build_services``, so they test the check the app actually uses, not a
+# stand-in. The build bundles policy version 2 (packaging/test-policy.json), as the policytest
+# build does.
+
+
+@pytest.fixture
+def newer_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.policy.POLICY_FILE", PACKAGING / "test-policy.json")
+
+
+def real_service(app_paths: AppPaths, database: Database) -> PolicyService:
+    from app.main import build_services
+
+    return build_services(app_paths, database, EventChannel()).policy
+
+
+def add_entry(app_paths: AppPaths, database: Database, settings: Settings) -> None:
+    """An entry kept after disconnecting with "keep local data"."""
+    database.connection.execute(
+        "INSERT INTO work_logs (page_id, issues, extra_fields, parent_task_ids, created_time,"
+        " last_edited_time, synced_at) VALUES ('p1', '[]', '{}', '[]',"
+        " '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')"
+    )
+    database.connection.commit()
+
+
+def save_sign_in(app_paths: AppPaths, database: Database, settings: Settings) -> None:
+    from app.notion.credentials import CredentialStore, StoredCredential
+    from app.redaction import Secret
+
+    CredentialStore(app_paths.credential_account).save(
+        StoredCredential(kind="internal", access_token=Secret("not-a-real-token"))
+    )
+
+
+def connected_via_oauth(app_paths: AppPaths, database: Database, settings: Settings) -> None:
+    settings.set("auth_kind", "oauth")
+
+
+def chose_a_work_log(app_paths: AppPaths, database: Database, settings: Settings) -> None:
+    settings.set("database_id", "db-1")
+
+
+def everything(app_paths: AppPaths, database: Database, settings: Settings) -> None:
+    save_sign_in(app_paths, database, settings)
+    settings.set_many({"auth_kind": "oauth", "database_id": "db-1", "mapping": {"version": 1}})
+    add_entry(app_paths, database, settings)
+
+
+#: What a copy from before Phase 8 can have left behind, each enough on its own.
+UPGRADES: dict[str, Callable[[AppPaths, Database, Settings], None]] = {
+    "a saved sign-in": save_sign_in,
+    "how it connected": connected_via_oauth,
+    "a chosen work log": chose_a_work_log,
+    "entries kept after disconnecting": add_entry,
+    "everything": everything,
+}
+
+
+@pytest.mark.usefixtures("newer_build")
+@pytest.mark.parametrize("left_behind", list(UPGRADES))
+def test_an_upgrade_with_no_recorded_version_counts_as_version_1(
+    app_paths: AppPaths, database: Database, settings: Settings, left_behind: str
+) -> None:
+    """A copy from before Phase 8 has no acknowledged_policy_version at all."""
+    UPGRADES[left_behind](app_paths, database, settings)
+    assert settings.get(ACKNOWLEDGED_KEY) is None
+    policies = real_service(app_paths, database)
+    assert policies.acknowledged_version() == 1
+    notice = policies.notice()
+    assert notice is not None
+    assert notice["acknowledged_version"] == 1
+    assert [c["version"] for c in notice["changes"]] == [2]
+    with pytest.raises(PolicyNotAcknowledgedError):
+        policies.require_acknowledged()
+    policies.acknowledge(2)
+    assert settings.get(ACKNOWLEDGED_KEY) == 2
+    assert real_service(app_paths, database).notice() is None
+
+
+@pytest.mark.usefixtures("newer_build")
+def test_a_truly_empty_install_shows_nothing_and_records_the_version_on_connecting(
+    app_paths: AppPaths, database: Database, settings: Settings
+) -> None:
+    policies = real_service(app_paths, database)
+    assert policies.acknowledged_version() is None
+    assert policies.notice() is None
+    policies.require_acknowledged()  # nothing is blocked
+    policies.record_connected()
+    assert settings.get(ACKNOWLEDGED_KEY) == 2
+    assert real_service(app_paths, database).notice() is None
+
+
+@pytest.mark.usefixtures("newer_build")
+def test_preferences_left_after_clearing_local_data_are_a_fresh_install(
+    app_paths: AppPaths, database: Database, settings: Settings
+) -> None:
+    """Disconnecting with "clear local data" removes the connection, the work log and the
+    entries but keeps preferences. Connecting again shows the policy where Connect links it,
+    so no notice is needed (this was the copy used in the first Step 6 run)."""
+    settings.set_many({"streak_threshold_minutes": 30, "raw_log_view": {"hidden": []}})
+    policies = real_service(app_paths, database)
+    assert policies.notice() is None
+    policies.record_connected()
+    assert settings.get(ACKNOWLEDGED_KEY) == 2
+
+
+@pytest.mark.usefixtures("newer_build")
+def test_a_recorded_version_wins_over_the_upgrade_rule(
+    app_paths: AppPaths, database: Database, settings: Settings
+) -> None:
+    settings.set_many({"auth_kind": "oauth", ACKNOWLEDGED_KEY: 2})
+    assert real_service(app_paths, database).notice() is None

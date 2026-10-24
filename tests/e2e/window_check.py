@@ -33,6 +33,9 @@ touched, and inspects it with ``evaluate_js``. Scenarios:
   opens a build bundling version 2 (``packaging/test-policy.json``): the notice comes first,
   nothing reaches Notion until Continue, and the token service is never contacted;
 * ``policy-relaunch``: the next launch of that build on the same folder shows no notice.
+* ``policy-unrecorded``: as ``policy-notice``, but the copy connected before Phase 8, so it has
+  no acknowledged version at all: it counts as version 1 and gets the notice (issue #13).
+* ``policy-fresh``: that build on an empty data folder shows Connect and no notice.
 
 Results are written as JSON; the process exits 0 even when a check fails, so the test can
 report every finding.
@@ -495,8 +498,9 @@ class RecordingService:
         self._httpd.shutdown()
 
 
-def seed_policy_copy(fake: FakeNotionServer, paths: AppPaths) -> None:
-    """A copy that connected with Notion sign-in and acknowledged policy version 1."""
+def seed_policy_copy(fake: FakeNotionServer, paths: AppPaths, acknowledged: int | None = 1) -> None:
+    """A copy that connected with Notion sign-in and acknowledged policy version 1, or, with
+    ``acknowledged=None``, connected before the app recorded a version."""
     from app.db import open_database
     from app.db.settings import Settings
     from app.notion.credentials import CredentialStore, StoredCredential, utc_now
@@ -514,10 +518,10 @@ def seed_policy_copy(fake: FakeNotionServer, paths: AppPaths) -> None:
     database = open_database(paths.database)
     Settings(database.connection).set_many(
         {
-            "acknowledged_policy_version": 1,
             "auth_kind": "oauth",
             "workspace_name": "E2E Workspace",
         }
+        | ({"acknowledged_policy_version": acknowledged} if acknowledged is not None else {})
     )
     database.close()
 
@@ -547,6 +551,18 @@ def policy_relaunch(fake: FakeNotionServer, service: RecordingService) -> Scenar
         wait_for(window, heading_is("Choose your work log"))
         wait_for(window, DATABASES_LOADED)
         results["notice_shown"] = window.evaluate_js(heading_is(POLICY_TITLE))
+        results["service_requests"] = list(service.requests)
+
+    return scenario
+
+
+def policy_fresh(fake: FakeNotionServer, service: RecordingService) -> Scenario:
+    def scenario(window: Any, results: dict[str, Any]) -> None:
+        wait_for(window, heading_is("See where your working hours go"))
+        time.sleep(2)  # time for a wrongly shown notice to appear
+        results["notice_shown"] = window.evaluate_js(heading_is(POLICY_TITLE))
+        results["connect_shown"] = window.evaluate_js(heading_is("See where your working hours go"))
+        results["notion_requests"] = len(fake.notion.requests)
         results["service_requests"] = list(service.requests)
 
     return scenario
@@ -1042,7 +1058,7 @@ def main() -> int:
             seed_fake_notion(fake)
             os.environ[NOTION_URL_ENV_VAR] = fake.url
             exit_code = open_window(mapping(fake))
-    elif name in ("policy-notice", "policy-relaunch"):
+    elif name in ("policy-notice", "policy-relaunch", "policy-unrecorded", "policy-fresh"):
         import app.policy
 
         # This run is the "newer" build: it bundles policy version 2.
@@ -1053,6 +1069,12 @@ def main() -> int:
             if name == "policy-notice":
                 seed_policy_copy(fake, paths)
                 scenario = policy_notice(fake, service)
+            elif name == "policy-unrecorded":
+                seed_policy_copy(fake, paths, acknowledged=None)
+                scenario = policy_notice(fake, service)
+            elif name == "policy-fresh":
+                seed_fake_notion(fake)
+                scenario = policy_fresh(fake, service)
             else:
                 load_state(fake, paths.root)
                 scenario = policy_relaunch(fake, service)
