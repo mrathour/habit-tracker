@@ -305,7 +305,7 @@ def save_sign_in(app_paths: AppPaths, database: Database, settings: Settings) ->
     from app.notion.credentials import CredentialStore, StoredCredential
     from app.redaction import Secret
 
-    CredentialStore(app_paths.credential_account).save(
+    CredentialStore.for_paths(app_paths).save(
         StoredCredential(kind="internal", access_token=Secret("not-a-real-token"))
     )
 
