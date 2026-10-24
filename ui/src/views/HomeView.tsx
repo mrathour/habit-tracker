@@ -1,6 +1,7 @@
 import type { ConnectionInfo } from "../bridge/types";
 import { WorkspaceBadge } from "../components/WorkspaceBadge";
 import { DashboardSection } from "../dashboard/DashboardView";
+import { MappingSuggestions } from "../sync/MappingSuggestions";
 import { SyncPanel } from "../sync/SyncPanel";
 import type { SyncState } from "../sync/useSync";
 
@@ -48,6 +49,7 @@ export function HomeView({
           <p>{info.full_sync_required.reason} It runs with the next sync.</p>
         </div>
       )}
+      <MappingSuggestions sync={sync} onReviewMapping={onReviewMapping} />
       <DashboardSection
         sync={sync.load.status === "ready" ? sync.load.sync : null}
         onShowFlagged={onShowFlagged}

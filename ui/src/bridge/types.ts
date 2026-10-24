@@ -102,7 +102,15 @@ export interface FieldOption {
 }
 
 export type FieldStatus =
-  "auto" | "saved" | "choose" | "missing" | "removed" | "type_changed" | "unused";
+  | "auto"
+  | "saved"
+  | "choose"
+  | "missing"
+  | "removed"
+  | "type_changed"
+  | "unused"
+  /** A column that appeared after the mapping was saved, selected for an unused field. */
+  | "new_column";
 
 export interface FieldReview {
   key: FieldKey;
@@ -116,6 +124,24 @@ export interface FieldReview {
   options: FieldOption[];
   message: string | null;
   missing_help: string | null;
+  /** Parent task link with no relation column in sight: how to share the linked database. */
+  share_help: string | null;
+}
+
+/** A column that appeared after the mapping was saved and fits an unused field (issue #12). */
+export interface MappingSuggestion {
+  field: FieldKey;
+  field_label: string;
+  property_id: string;
+  column_name: string;
+  message: string;
+}
+
+/** A column the sample rows hold but the schema leaves out (an unshared relation). */
+export interface HiddenColumn {
+  name: string;
+  type: string;
+  type_label: string;
 }
 
 export interface SchemaIssue {
@@ -130,6 +156,7 @@ export interface SchemaCheck {
   blocking: SchemaIssue[];
   warnings: SchemaIssue[];
   renamed: { property_id: string; old_name: string; new_name: string }[];
+  suggestions: MappingSuggestion[];
 }
 
 export interface MappingReview {
@@ -144,6 +171,7 @@ export interface MappingReview {
   sample_limit: number;
   full_sync_required: FullSyncFlag | null;
   schema_check: SchemaCheck | null;
+  hidden_columns: HiddenColumn[];
 }
 
 export interface SaveMappingResult {
@@ -203,6 +231,7 @@ export interface SyncStatus {
   flagged: number;
   pending_removal: PendingRemoval | null;
   full_sync_required: boolean;
+  mapping_suggestions: MappingSuggestion[];
 }
 
 export interface Issue {
@@ -443,6 +472,9 @@ export interface DetailSession {
   overlap_minutes: number;
   overlaps_with: { page_id: string; label: string }[];
   url: string;
+  /** Every linked parent page in Notion's order; the first is the parent task. */
+  parent_task_ids: string[];
+  parent_urls: string[];
 }
 
 export interface DayDetail {
@@ -545,6 +577,7 @@ export interface PythonApi {
     fields: Record<FieldKey, FieldRef | null>,
     extra: string[],
   ): Promise<BridgeResponse<SaveMappingResult>>;
+  dismiss_mapping_suggestion(propertyId: string): Promise<BridgeResponse<MappingSuggestion[]>>;
   get_sync_status(): Promise<BridgeResponse<SyncStatus>>;
   start_sync(kind: SyncRequest): Promise<BridgeResponse<SyncStatus>>;
   get_flagged_entries(offset: number, limit: number): Promise<BridgeResponse<FlaggedPage>>;

@@ -133,6 +133,30 @@ function DetailBody({ detail }: { detail: DayDetail }) {
               <dd className="figure">{formatDuration(session.minutes)}</dd>
               <dt>Counted this day</dt>
               <dd className="figure">{formatDuration(session.counted_minutes)}</dd>
+              {session.parent_urls.length > 0 && (
+                <>
+                  <dt>Parent task</dt>
+                  <dd className="detail-links">
+                    {session.parent_urls.map((url, index) => (
+                      <button
+                        key={`${String(index)}-${url}`}
+                        type="button"
+                        className="link-button small"
+                        aria-label={
+                          index === 0
+                            ? `Open the parent task of ${session.task_name ?? "Untitled"} in Notion`
+                            : `Open linked page ${String(index + 1)} of ${session.task_name ?? "Untitled"} in Notion`
+                        }
+                        onClick={() => {
+                          openInNotion(url);
+                        }}
+                      >
+                        {index === 0 ? "Open parent task" : `Linked page ${String(index + 1)}`}
+                      </button>
+                    ))}
+                  </dd>
+                </>
+              )}
             </dl>
             {session.crosses_midnight && (
               <p className="small muted">

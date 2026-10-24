@@ -85,7 +85,10 @@ export function isDirty(
   selections: Selections,
   extra: ReadonlySet<string>,
 ): boolean {
-  const fieldsChanged = review.fields.some((f) => !sameRef(f.selection, selections[f.key]));
+  // A new column is preselected but not saved yet, so keeping it is a change too.
+  const fieldsChanged = review.fields.some(
+    (f) => !sameRef(f.status === "new_column" ? null : f.selection, selections[f.key]),
+  );
   const saved = new Set(review.extra);
   return fieldsChanged || saved.size !== extra.size || [...extra].some((id) => !saved.has(id));
 }
