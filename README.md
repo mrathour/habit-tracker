@@ -55,7 +55,7 @@ Then choose your work log and check how its columns map to the app's fields. Hab
 ## Where your data is kept
 
 - **Your entries, settings and logs** are in `%APPDATA%\HabitTracker` on your computer.
-- **Your Notion sign-in** is in Windows Credential Manager, under **Windows Credentials** → **HabitTracker**.
+- **Your Notion sign-in** is in Windows Credential Manager, under **Windows Credentials** → **HabitTracker**, with the user name `notion`.
 - Nothing is sent anywhere else. The sign-in service is used only when you connect, when access is renewed, and when you disconnect. See the [privacy policy](https://habit-tracker.mrathour.workers.dev/privacy).
 
 Reinstalling or upgrading keeps both, so you carry on where you left off.
@@ -73,7 +73,11 @@ The uninstaller asks one question:
 - **Leave "Also delete my Habit Tracker data and Notion sign-in" unticked** (the default) to keep your data and sign-in for a later reinstall.
 - **Tick it** to remove everything: it deletes `%APPDATA%\HabitTracker` and the sign-in in Credential Manager. If you connected with Notion sign-in, it also cancels Habit Tracker's access with Notion. A pasted token can't be cancelled by the app: delete the internal connection, or revoke the personal access token, in Notion's developer portal. Nothing in Notion itself is changed.
 
-If you uninstalled without the option and want to remove everything later, delete the `%APPDATA%\HabitTracker` folder, remove **HabitTracker** under **Windows Credentials** in Credential Manager, and remove Habit Tracker in Notion under **Settings → Connections**.
+If you uninstalled without the option and want to remove everything later:
+
+- Delete the `%APPDATA%\HabitTracker` folder.
+- To remove your Notion sign-in manually, open **Control Panel → Credential Manager → Windows Credentials**. Remove the entry named **HabitTracker** whose user name is `notion`, and the entry named **notion@HabitTracker** if there is one. Leave any other entries.
+- Remove Habit Tracker in Notion under **Settings → Connections**.
 
 ## Help
 

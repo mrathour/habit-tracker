@@ -503,7 +503,7 @@ def seed_policy_copy(fake: FakeNotionServer, paths: AppPaths) -> None:
     from app.redaction import Secret
 
     seed_fake_notion(fake)
-    CredentialStore(paths.credential_account).save(
+    CredentialStore.for_paths(paths).save(
         StoredCredential(
             kind="oauth",
             access_token=Secret(fake.notion.issue_token()),
