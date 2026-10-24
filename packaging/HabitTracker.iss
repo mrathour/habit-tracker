@@ -304,8 +304,9 @@ begin
   if (Code and CleanupPastedPat) <> 0 then
     AddMessage('Your token was deleted from this PC. It still works until it expires or you revoke it under Personal access tokens in Notion''s developer portal.');
   if ((Code and CleanupFailed) <> 0) or ((Code and CleanupCredentialKept) <> 0) then
-    AddMessage('Your Notion sign-in could not be deleted. To delete it yourself, open Credential Manager from the Start menu, '
-      + 'choose Windows Credentials, and remove the entry named HabitTracker.');
+    AddMessage('Your Notion sign-in could not be deleted. To delete it yourself, open Credential Manager from the Start menu '
+      + 'and choose Windows Credentials. Remove the entry named HabitTracker whose user name is notion, and the entry named '
+      + 'notion@HabitTracker if there is one. Leave any other entries.');
 
   { The default data folder is Habit Tracker's own, so anything left in it goes too. }
   DataDir := ExpandConstant('{userappdata}\{#DataFolderName}');
