@@ -117,7 +117,7 @@ def remove_local_data(paths: AppPaths) -> Outcome:
 
 def run_cleanup(paths: AppPaths, service: TokenServiceClient) -> int:
     try:
-        outcome = remove_sign_in(CredentialStore(paths.credential_account), service)
+        outcome = remove_sign_in(CredentialStore.for_paths(paths), service)
         outcome |= remove_local_data(paths)
     except Exception:  # the uninstaller explains a failure
         logger.exception("Uninstall cleanup failed")

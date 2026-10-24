@@ -9,7 +9,7 @@ import pytest
 
 from app import main
 from app.db import open_database
-from app.notion.credentials import SERVICE_NAME, CredentialStore, StoredCredential, utc_now
+from app.notion.credentials import CredentialStore, StoredCredential, utc_now
 from app.paths import AppPaths
 from app.redaction import Secret
 from app.uninstall import Outcome, remove_local_data, run_cleanup
@@ -32,7 +32,7 @@ class FakeService:
 
 
 def store_credential(paths: AppPaths, kind: str) -> None:
-    CredentialStore(paths.credential_account).save(
+    CredentialStore.for_paths(paths).save(
         StoredCredential(
             kind=kind,  # type: ignore[arg-type]
             access_token=Secret("ntn_access_for_uninstall_test"),
@@ -99,7 +99,8 @@ def test_never_connected_and_no_folder(tmp_path: Path) -> None:
 
 
 def test_damaged_entry_is_still_deleted(app_paths: AppPaths) -> None:
-    keyring.set_password(SERVICE_NAME, app_paths.credential_account, "{not json")
+    store = CredentialStore.for_paths(app_paths)
+    keyring.set_password(store.service, store.account, "{not json")
     assert run(app_paths, FakeService()) == Outcome.DONE
     assert MemoryKeyring.store == {}
 
