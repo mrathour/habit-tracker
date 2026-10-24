@@ -174,10 +174,14 @@ describe("issues and overlaps", () => {
     start();
     await grid();
     const logged = within(rowFor("Réunion équipe")).getByText("200 min");
-    fireEvent.mouseOver(logged);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(
-      "Logged 200 min, but Start → End is 120 min.",
-    );
+    // The table attaches its hover listener in an effect after the rows render, which a slow
+    // CI runner can reach after the first hover: hover again until the tooltip shows.
+    await waitFor(() => {
+      fireEvent.mouseOver(logged);
+      expect(screen.getByRole("tooltip")).toHaveTextContent(
+        "Logged 200 min, but Start → End is 120 min.",
+      );
+    });
   });
 
   it("lists every issue from the Issues cell", async () => {
