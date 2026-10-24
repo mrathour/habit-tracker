@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from app.paths import HOME_ENV_VAR, ui_dist_dir
-from tests.support.notion_schemas import BROKEN_EXPECTED
+from tests.support.notion_schemas import BROKEN_EXPECTED, SECOND_TASK, TASK_PAGE
 
 pytestmark = pytest.mark.gui
 
@@ -328,4 +328,34 @@ def test_raw_log_flags_every_broken_entry_with_its_explanation(tmp_path: Path) -
     assert "Logged 148 min, but Start → End is 123 min." in {row[-1] for row in rows[1:]}
     # Clearing the filters shows every entry again.
     assert results["all_status"].startswith(f"{total} entries")
+    assert "ntn_" not in log
+
+
+def test_parent_task_maps_once_its_database_is_shared_and_opens_in_notion(
+    tmp_path: Path,
+) -> None:
+    """Issue #12, with the real Work Log's schema: Notion hides "Parent Task" until the Task
+    Tracker is shared, the mapping says how to share it, and once mapped its links open."""
+    results, log = run_harness(tmp_path, "parent-task")
+    # Unshared: the column is hidden, the field explains how to share the Task Tracker.
+    assert results["parent_before"] == "Not used"
+    assert "Share the linked database to use parent task link" in results["share_help"]
+    assert "Notion is hiding the relation column “Parent Task”" in results["share_help"]
+    assert "••• → Connections" in results["share_help"]
+    # Shared, then Check again: mapped automatically.
+    assert results["parent_after"] == "Parent Task · Relation"
+    assert results["share_help_after"] is False
+    with closing(sqlite3.connect(tmp_path / "home" / "habit_tracker.db")) as db:
+        links = dict(db.execute("SELECT page_id, parent_task_ids FROM work_logs"))
+    assert {k: json.loads(v) for k, v in links.items()} == {
+        "parent-a": [TASK_PAGE],
+        "parent-b": [TASK_PAGE, SECOND_TASK],
+    }
+    task, second = (f"https://www.notion.so/{p.replace('-', '')}" for p in (TASK_PAGE, SECOND_TASK))
+    # The raw log's Parent task cell, then both links in the day detail.
+    assert results["raw_cell"].startswith("Parent task")  # then its "⋯" filter chip
+    assert results["opened_from_raw_log"] == [task]
+    assert "Parent task" in results["detail"]
+    assert "Linked page 2" in results["detail"]
+    assert results["opened"] == [task, task, second]
     assert "ntn_" not in log
