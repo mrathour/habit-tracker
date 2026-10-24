@@ -30,6 +30,7 @@ from app.paths import AppPaths
 
 if TYPE_CHECKING:
     from app.mapping.review import MappingReview, MappingService, SaveResult
+    from app.mapping.suggest import SuggestionDict
     from app.notion.connection import ConnectionInfo, ConnectionService, DataSourcePage
     from app.rawlog.service import ExportResult, RawLogPage, RawLogService
     from app.rawlog.view import ViewPrefs
@@ -255,6 +256,11 @@ class Api:
     @bridge_method
     def save_mapping(self, fields: object, extra: object) -> SaveResult:
         return self._mapping().save(fields, extra)
+
+    @bridge_method
+    def dismiss_mapping_suggestion(self, property_id: object) -> list[SuggestionDict]:
+        """Stop offering a new column for an unused field (issue #12); the offers left."""
+        return self._mapping().dismiss_suggestion(property_id)
 
     # --- Sync (PLAN.md 6) ------------------------------------------------------------------
 

@@ -296,4 +296,5 @@ def test_to_dict() -> None:
             }
         ],
         "renamed": [],
+        "suggestions": [],
     }

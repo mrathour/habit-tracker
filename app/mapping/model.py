@@ -13,12 +13,18 @@ Shape (version 1)::
       },
       "extra": ["xyz"],
       "names_at_save": {"abc": "Session", "title": "Name", "xyz": "Mood"},
+      "known_columns": ["abc", "title", "xyz", "def"],
       "saved_at": "2026-10-22T10:00:00.000Z"
     }
 
 Mappings are **by property ID**, so renaming a column in Notion never breaks them.
 ``names_at_save`` only words messages such as "“End Time” no longer exists"; it is never used to
 find a column.
+
+``known_columns`` lists every column the user saw when saving, plus columns they chose to ignore
+later. A column that appears afterwards (for example once a related database is shared with the
+connection, issue #12) and fits an unused optional field is offered to the user
+(``app/mapping/suggest.py``). Mappings saved before this key existed have it as ``None``.
 """
 
 from __future__ import annotations
@@ -39,6 +45,8 @@ class StoredMapping(TypedDict):
     fields: dict[FieldKey, FieldRef | None]
     extra: list[str]
     names_at_save: dict[str, str]
+    #: Every column present at save, plus dismissed suggestions; None for older mappings.
+    known_columns: list[str] | None
     saved_at: str
 
 
@@ -74,6 +82,11 @@ def parse_mapping(value: object) -> StoredMapping:
     extra = value.get("extra", [])
     names = value.get("names_at_save", {})
     saved_at = value.get("saved_at", "")
+    known = value.get("known_columns")
+    if known is not None and (
+        not isinstance(known, list) or not all(isinstance(item, str) for item in known)
+    ):
+        raise MappingFormatError("The saved column mapping is damaged. Map the columns again.")
     if (
         not isinstance(raw_fields, dict)
         or not isinstance(extra, list)
@@ -93,6 +106,7 @@ def parse_mapping(value: object) -> StoredMapping:
         "fields": fields,
         "extra": list(dict.fromkeys(extra)),
         "names_at_save": {str(k): str(v) for k, v in names.items() if isinstance(v, str)},
+        "known_columns": list(dict.fromkeys(known)) if known is not None else None,
         "saved_at": saved_at,
     }
 
@@ -167,6 +181,7 @@ def build_mapping(
         "fields": {field.key: fields.get(field.key) for field in FIELDS},
         "extra": list(extra),
         "names_at_save": {pid: by_id[pid].name for pid in dict.fromkeys(used) if pid in by_id},
+        "known_columns": [p.id for p in props],
         "saved_at": saved_at,
     }
 

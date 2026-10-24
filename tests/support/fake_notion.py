@@ -13,7 +13,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import format_datetime
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qs
 
 import httpx
@@ -57,8 +57,13 @@ class FakeNotion:
     valid_refresh_tokens: set[str] = field(default_factory=set)
     databases: dict[str, FakeDatabase] = field(default_factory=dict)
     data_sources: dict[str, FakeDataSource] = field(default_factory=dict)
-    #: Hidden from search (not shared with the integration).
+    #: Hidden from search (not shared with the integration). Relations to these databases are
+    #: left out of other data sources' schemas, as Notion does: "If the related database is not
+    #: shared, properties based on relations will not be included in the API response."
     unshared: set[str] = field(default_factory=set)
+    #: What pages hold for such a relation. Notion's docs say only that missing access "can
+    #: leave relation values empty", so tests cover both an empty value and none at all.
+    unshared_relation_values: Literal["empty", "omitted"] = "empty"
     #: Databases whose own object can't be read, though their data sources can.
     unreadable_databases: set[str] = field(default_factory=set)
     page_size: int = 100
@@ -196,8 +201,35 @@ class FakeNotion:
             },
         )
 
+    def _hidden_relations(self, source: FakeDataSource) -> set[str]:
+        """Property IDs of relations to databases the integration can't see."""
+        hidden: set[str] = set()
+        for spec in source.properties.values():
+            if spec.get("type") != "relation":
+                continue
+            config = spec.get("relation") or {}
+            target = self.data_sources.get(str(config.get("data_source_id")))
+            database_id = target.database_id if target else config.get("database_id")
+            if database_id in self.unshared:
+                hidden.add(str(spec["id"]))
+        return hidden
+
+    def _visible_page(self, page: dict[str, Any], hidden: set[str]) -> dict[str, Any]:
+        if not hidden:
+            return page
+        properties: dict[str, Any] = {}
+        for name, value in page["properties"].items():
+            if value.get("id") not in hidden:
+                properties[name] = value
+            elif self.unshared_relation_values == "empty":
+                properties[name] = {**value, "relation": [], "has_more": False}
+        return {**page, "properties": properties}
+
     def _query(self, source: FakeDataSource, body: dict[str, Any]) -> httpx.Response:
-        rows = [page for page in source.pages if not page.get("in_trash")]
+        hidden = self._hidden_relations(source)
+        rows = [
+            self._visible_page(page, hidden) for page in source.pages if not page.get("in_trash")
+        ]
         query_filter = body.get("filter")
         if query_filter:
             edited = query_filter.get("last_edited_time", {})
@@ -312,7 +344,11 @@ class FakeNotion:
                 {"type": "text", "plain_text": source.name, "text": {"content": source.name}}
             ],
             "parent": {"type": "database_id", "database_id": source.database_id},
-            "properties": source.properties,
+            "properties": {
+                name: spec
+                for name, spec in source.properties.items()
+                if spec.get("id") not in self._hidden_relations(source)
+            },
         }
 
     # --- OAuth (used behind the token service in end-to-end tests) -------------------------

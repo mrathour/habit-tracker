@@ -22,11 +22,14 @@ CONNECTION_KEYS: Final = (
 #: The column mapping (PLAN.md 4) and the flag set when it changes after the first save.
 MAPPING_KEY: Final = "mapping"
 FULL_SYNC_REQUIRED_KEY: Final = "full_sync_required"
+#: New columns that fit an unused optional field, found by the last sync's schema check.
+MAPPING_SUGGESTIONS_KEY: Final = "mapping_suggestions"
 #: Data that belongs to one Notion database: cleared with "clear local data".
 SOURCE_DATA_KEYS: Final = (
     *SOURCE_KEYS,
     MAPPING_KEY,
     FULL_SYNC_REQUIRED_KEY,
+    MAPPING_SUGGESTIONS_KEY,
     "last_successful_sync",
     "last_full_sync",
     "last_sync_result",

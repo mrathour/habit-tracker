@@ -32,6 +32,7 @@ PUBLIC_METHODS = {
     "choose_data_source",
     "get_mapping_review",
     "save_mapping",
+    "dismiss_mapping_suggestion",
     "get_sync_status",
     "start_sync",
     "get_flagged_entries",
