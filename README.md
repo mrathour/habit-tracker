@@ -79,6 +79,12 @@ If you uninstalled without the option and want to remove everything later:
 - To remove your Notion sign-in manually, open **Control Panel → Credential Manager → Windows Credentials**. Remove the entry named **HabitTracker** whose user name is `notion`, and the entry named **notion@HabitTracker** if there is one. Leave any other entries.
 - Remove Habit Tracker in Notion under **Settings → Connections**.
 
+## License
+
+Habit Tracker is released under the [MIT License](LICENSE). It is built on open-source software
+whose licenses are in `THIRD_PARTY_NOTICES.txt`, installed next to the app in
+`%LOCALAPPDATA%\Programs\Habit Tracker` (with `LICENSE.txt`).
+
 ## Help
 
 - [Support page](https://habit-tracker.mrathour.workers.dev/support): connecting, tokens, and where your data is.

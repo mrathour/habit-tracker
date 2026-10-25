@@ -2,6 +2,7 @@
 ;   /DAppVersion=X.Y.Z             from pyproject.toml
 ;   /DSourceDir=...                the PyInstaller output folder (HabitTracker\)
 ;   /DWebView2Bootstrapper=...     Microsoft's Evergreen bootstrapper, signature checked
+;   /DNoticesDir=...               LICENSE.txt and THIRD_PARTY_NOTICES.txt, installed beside the app
 ;   /DOutputDir=... /DOutputName=...
 ;
 ; Per user, no administrator rights: %LOCALAPPDATA%\Programs\Habit Tracker.
@@ -18,6 +19,9 @@
 #endif
 #ifndef WebView2Bootstrapper
   #error Pass /DWebView2Bootstrapper=<MicrosoftEdgeWebview2Setup.exe> (packaging\build.ps1 does this).
+#endif
+#ifndef NoticesDir
+  #error Pass /DNoticesDir=<folder with LICENSE.txt and THIRD_PARTY_NOTICES.txt> (packaging\build.ps1 does this).
 #endif
 #ifndef OutputDir
   #define OutputDir "..\build\installer"
@@ -87,6 +91,8 @@ Type: filesandordirs; Name: "{app}\_internal"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#NoticesDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#NoticesDir}\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#WebView2Bootstrapper}"; DestName: "MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
 [Icons]
