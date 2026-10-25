@@ -139,6 +139,50 @@ jobs:
       - name: Window tests (modes, error pages, connecting with a token and with Notion sign-in)
         run: uv run pytest -m gui -v
 
+  installer:
+    name: Installer (build, install, upgrade, uninstall)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: |
+          uv sync --locked --group build
+          npm --prefix ui ci
+      - name: Install Inno Setup
+        shell: pwsh
+        run: ./packaging/install-inno-setup.ps1
+      - name: Build Setup.exe
+        shell: pwsh
+        run: ./packaging/build.ps1
+      - name: Install, upgrade and uninstall it
+        shell: pwsh
+        run: ./packaging/test-installer.ps1 -Setup (Get-ChildItem build/installer/HabitTracker-Setup-*.exe).FullName
+      - name: Keep the installer logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-test-logs
+          path: build/installer-test/
+          if-no-files-found: ignore
+      - name: Keep Setup.exe for manual testing
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: setup-exe
+          path: build/installer/
+          retention-days: 14
+
   hygiene:
     name: Repository hygiene (pre-commit)
     runs-on: windows-latest

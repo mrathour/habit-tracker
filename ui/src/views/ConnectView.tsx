@@ -5,6 +5,7 @@ import { TimeStrip } from "../components/TimeStrip";
 import { SignInStatus } from "../connection/SignInStatus";
 import { TokenForm } from "../connection/TokenForm";
 import { useSignIn } from "../connection/useSignIn";
+import { openPage, PRIVACY_URL, TERMS_URL } from "../policy/links";
 
 /** First run: connect to Notion with the browser, or with a pasted token. */
 export function ConnectView({ onConnected }: { onConnected: (info: ConnectionInfo) => void }) {
@@ -24,6 +25,28 @@ export function ConnectView({ onConnected }: { onConnected: (info: ConnectionInf
           <li>It only reads from Notion. It never changes your workspace.</li>
           <li>Your entries stay on this computer, so charts work offline.</li>
         </ul>
+        <p className="small muted legal-links">
+          How the app handles your data:{" "}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              openPage(PRIVACY_URL);
+            }}
+          >
+            Privacy policy
+          </button>{" "}
+          ·{" "}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              openPage(TERMS_URL);
+            }}
+          >
+            Terms of use
+          </button>
+        </p>
 
         {useToken ? (
           <>

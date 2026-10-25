@@ -10,6 +10,7 @@ import { WorkspaceBadge } from "../components/WorkspaceBadge";
 import { authKindLabel, connectionLabel, disconnectSummary } from "../connection/labels";
 import { TokenForm } from "../connection/TokenForm";
 import { noticeFromCallError } from "../errors/reporting";
+import { openPage, PRIVACY_URL } from "../policy/links";
 import { DashboardSettings } from "../dashboard/DashboardSettings";
 import { formatWhen } from "../sync/format";
 import { MappingSuggestions } from "../sync/MappingSuggestions";
@@ -192,6 +193,21 @@ export function SettingsView({
                 }}
               >
                 Open log folder
+              </button>
+            </dd>
+            <dt>Privacy policy</dt>
+            <dd>
+              {details.policy_version !== null && (
+                <span className="figure">Version {details.policy_version} </span>
+              )}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  openPage(PRIVACY_URL);
+                }}
+              >
+                Read the privacy policy
               </button>
             </dd>
           </dl>

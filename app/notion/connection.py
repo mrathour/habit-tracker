@@ -147,6 +147,7 @@ class ConnectionService:
         open_browser: Callable[[str], object] = lambda url: webbrowser.open(url),
         http: httpx.Client | None = None,
         sign_in_timeout_s: float = SIGN_IN_TIMEOUT_S,
+        on_connected: Callable[[], None] | None = None,
     ) -> None:
         self._tokens = tokens
         self._reader = reader
@@ -158,6 +159,7 @@ class ConnectionService:
         self._open_browser = open_browser
         self._http = http or httpx.Client(timeout=10.0, follow_redirects=True)
         self._timeout = sign_in_timeout_s
+        self._on_connected = on_connected
         self._lock = threading.Lock()
         self._sign_in: _SignIn | None = None
         self._titles: dict[str, tuple[str, str | None]] = {}
@@ -213,6 +215,7 @@ class ConnectionService:
             }
         )
         logger.info("Connected to Notion with a pasted %s token", kind)
+        self._connected()
         return self.info()
 
     def _revoke_previous_oauth(self) -> None:
@@ -339,6 +342,16 @@ class ConnectionService:
             }
         )
         logger.info("Connected to Notion through OAuth")
+        self._connected()
+
+    def _connected(self) -> None:
+        """Record that the user connected, where the privacy policy is linked (PLAN.md 13)."""
+        if self._on_connected is None:
+            return
+        try:
+            self._on_connected()
+        except Exception:  # the connection itself succeeded
+            logger.exception("Couldn't record the privacy policy version after connecting")
 
     def _finish(
         self,

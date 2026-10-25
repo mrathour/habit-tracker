@@ -1,0 +1,72 @@
+name: Release
+
+# Pushing a vX.Y.Z tag on main builds Setup.exe, tests it, and publishes a GitHub Release with
+# the CHANGELOG.md entry as its notes (PLAN.md 13, 15.2).
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUTF8: "1"
+  UV_FROZEN: "1"
+
+jobs:
+  release:
+    name: Build, test and publish Setup.exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # create the Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the tag and write the release notes
+        shell: pwsh
+        run: ./packaging/release-notes.ps1 -Tag "$env:GITHUB_REF_NAME" -Out build/release-notes.md
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Install dependencies
+        run: |
+          uv sync --locked --group build
+          npm --prefix ui ci
+      - name: Back-end tests
+        run: uv run pytest
+      - name: UI tests
+        run: npm --prefix ui test
+      - name: Install Inno Setup
+        shell: pwsh
+        run: ./packaging/install-inno-setup.ps1
+      - name: Build Setup.exe
+        shell: pwsh
+        run: ./packaging/build.ps1
+      - name: Install, upgrade and uninstall it
+        shell: pwsh
+        run: ./packaging/test-installer.ps1 -Setup (Get-ChildItem build/installer/HabitTracker-Setup-*.exe).FullName
+      - name: Publish the GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "$env:GITHUB_REF_NAME".TrimStart("v")
+          $setup = "build/installer/HabitTracker-Setup-$version.exe"
+          $flags = @()
+          # 0.x versions are test releases (v1.0.0 is the first public release).
+          if ($version.StartsWith("0.")) { $flags += "--prerelease" }
+          gh release create "$env:GITHUB_REF_NAME" $setup "$setup.sha256" `
+            --repo "$env:GITHUB_REPOSITORY" --verify-tag `
+            --title "Habit Tracker $version" --notes-file build/release-notes.md @flags
+          if ($LASTEXITCODE -ne 0) { throw "Creating the release failed." }

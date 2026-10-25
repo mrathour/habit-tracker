@@ -46,6 +46,8 @@ PUBLIC_METHODS = {
     "export_raw_log",
     "show_exported_file",
     "open_external",
+    "get_policy_notice",
+    "acknowledge_policy",
 }
 
 

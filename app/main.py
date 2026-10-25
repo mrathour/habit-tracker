@@ -27,6 +27,7 @@ from typing import Any, Final
 from app import APP_NAME, __version__
 from app.api import Api, AppContext, Mode
 from app.db import Database, open_database
+from app.db.connection import lock_for
 from app.db.settings import Settings
 from app.devserver import DEFAULT_DEV_URL, ViteDevServer, ensure_dev_server
 from app.error_page import render_error_page
@@ -40,10 +41,13 @@ from app.notion.credentials import CredentialStore
 from app.notion.service_client import DEFAULT_SERVICE_URL, SERVICE_URL_ENV_VAR, TokenServiceClient
 from app.notion.tokens import TokenManager
 from app.paths import AppPaths, resource_root, ui_dist_dir
+from app.policy import PolicyService, load_policy
 from app.rawlog.service import RawLogService
 from app.single_instance import SingleInstance, bring_existing_window_to_front
 from app.stats.service import StatsService
 from app.sync.engine import SyncService
+from app.uninstall import cleanup_from_installer
+from app.webview2 import check_runtime, missing_runtime_help
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,9 @@ WINDOW_MIN_SIZE: Final = (960, 640)
 #: Dev mode has no watchdog: Vite's error overlay and the inspector show what went wrong, and
 #: replacing the page would stop hot reload from recovering once the code is fixed.
 UI_READY_TIMEOUT_S: Final = 15.0
+#: Always Edge WebView2: pywebview would otherwise fall back to Internet Explorer's engine,
+#: which can't run the interface (PLAN.md 13).
+WEB_ENGINE: Final = "edgechromium"
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -74,6 +81,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--self-check",
         action="store_true",
         help="start up without opening a window, print a JSON report, and exit",
+    )
+    parser.add_argument(
+        "--uninstall-cleanup",
+        action="store_true",
+        help="used by the uninstaller: disconnect from Notion and delete the local data",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
@@ -142,12 +154,24 @@ def self_check(args: argparse.Namespace, paths: AppPaths, log_file: Path) -> int
             "schema_version": startup.database.schema_version if startup.database else None,
             "log_file": str(log_file),
             "ui_url": startup.url,
+            "frozen": bool(getattr(sys, "frozen", False)),
+            "policy_version": load_policy().version,
+            "credential_store": _keyring_backend(),
+            "webview2": check_runtime().webview2_version,
             "error": startup.error.to_dict() if startup.error else None,
         }
     finally:
         startup.close()
     sys.stdout.write(json.dumps(report, indent=2) + "\n")
     return 0 if report["ok"] else 1
+
+
+def _keyring_backend() -> str:
+    """Which keyring backend is active: Windows Credential Manager in a working build."""
+    import keyring
+
+    backend = keyring.get_keyring()
+    return f"{type(backend).__module__}.{type(backend).__name__}"
 
 
 class UiReadyWatchdog:
@@ -183,12 +207,20 @@ class UiReadyWatchdog:
                 self._armed = False
 
 
-def build_services(
-    paths: AppPaths, database: Database, events: EventChannel
-) -> tuple[ConnectionService, MappingService, SyncService, StatsService, RawLogService]:
+@dataclass(slots=True)
+class Services:
+    connection: ConnectionService
+    mapping: MappingService
+    sync: SyncService
+    stats: StatsService
+    rawlog: RawLogService
+    policy: PolicyService
+
+
+def build_services(paths: AppPaths, database: Database, events: EventChannel) -> Services:
     """Wire the Notion connection (Credential Manager, token service, reader and settings), the
-    column mapping, the sync engine, the dashboard and the raw log, which share its reader and
-    settings."""
+    column mapping, the sync engine, the dashboard, the raw log and the privacy-policy notice,
+    which share its reader and settings."""
     service = TokenServiceClient(os.environ.get(SERVICE_URL_ENV_VAR) or DEFAULT_SERVICE_URL)
     notion_url = os.environ.get(NOTION_URL_ENV_VAR) or DEFAULT_NOTION_URL
     tokens = TokenManager(CredentialStore.for_paths(paths), service)
@@ -198,6 +230,18 @@ def build_services(
         return NotionReader(manager, base_url=notion_url)
 
     reader = make_reader(tokens)
+
+    def has_connected() -> bool:
+        """This copy has been connected before (its policy baseline is the first version)."""
+        if tokens.credential() is not None:
+            return True
+        if any(settings.get(key) is not None for key in ("auth_kind", "database_id")):
+            return True
+        with lock_for(database.connection):
+            row = database.connection.execute("SELECT 1 FROM work_logs LIMIT 1").fetchone()
+        return row is not None
+
+    policy = PolicyService(settings=settings, has_connected=has_connected)
     connection = ConnectionService(
         tokens=tokens,
         reader=reader,
@@ -206,6 +250,7 @@ def build_services(
         db=database.connection,
         emit=events.emit,
         make_reader=make_reader,
+        on_connected=policy.record_connected,
     )
     mapping = MappingService(tokens=tokens, reader=reader, settings=settings)
     sync = SyncService(
@@ -218,7 +263,7 @@ def build_services(
     )
     stats = StatsService(db=database.connection, settings=settings)
     rawlog = RawLogService(db=database.connection, settings=settings)
-    return connection, mapping, sync, stats, rawlog
+    return Services(connection, mapping, sync, stats, rawlog, policy)
 
 
 def save_dialog(window: Any) -> Callable[[str], str | None]:  # noqa: ANN401 - a pywebview Window
@@ -256,22 +301,19 @@ def run_window(
     mode: Mode = "dev" if args.dev else "normal"
     events = EventChannel()
     startup = prepare(args, paths)
-    connection, mapping, sync, stats, rawlog = (
-        build_services(paths, startup.database, events)
-        if startup.database
-        else (None, None, None, None, None)
-    )
+    services = build_services(paths, startup.database, events) if startup.database else None
     context = AppContext(
         mode=mode,
         paths=paths,
         database=startup.database,
         events=events,
         diagnostics=args.dev or args.diagnostics,
-        connection=connection,
-        mapping=mapping,
-        sync=sync,
-        stats=stats,
-        rawlog=rawlog,
+        connection=services.connection if services else None,
+        mapping=services.mapping if services else None,
+        sync=services.sync if services else None,
+        stats=services.stats if services else None,
+        rawlog=services.rawlog if services else None,
+        policy=services.policy if services else None,
     )
     install_excepthooks(lambda report: events.emit("app:error", report.to_dict()))
 
@@ -326,9 +368,9 @@ def run_window(
     logger.info("Opening the window (%s mode)", mode)
     try:
         if automation is None:
-            webview.start(debug=args.dev, private_mode=True)
+            webview.start(gui=WEB_ENGINE, debug=args.dev, private_mode=True)
         else:
-            webview.start(automation, (window,), debug=args.dev, private_mode=True)
+            webview.start(automation, (window,), gui=WEB_ENGINE, debug=args.dev, private_mode=True)
     finally:
         startup.close()
         logger.info("Window closed")
@@ -346,8 +388,59 @@ def show_fatal_message(message: str) -> None:
         sys.stderr.write(message + "\n")
 
 
+def ensure_stdio() -> None:
+    """Give the windowed (console-less) build somewhere to print ``--self-check`` and
+    ``--version``: the console it was started from, or nowhere."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    attached = False
+    if sys.platform == "win32":
+        import ctypes
+
+        attach_parent_process = -1
+        attached = bool(ctypes.windll.kernel32.AttachConsole(attach_parent_process))
+    target = "CONOUT$" if attached else os.devnull
+    if sys.stdout is None:
+        sys.stdout = Path(target).open("w", encoding="utf-8")  # noqa: SIM115 - kept open
+    if sys.stderr is None:
+        sys.stderr = Path(target).open("w", encoding="utf-8")  # noqa: SIM115
+
+
+def check_webview_runtime() -> bool:
+    """Explain instead of opening a broken window when WebView2 is missing (PLAN.md 13)."""
+    runtime = check_runtime()
+    if runtime.ok:
+        logger.info("WebView2 Runtime %s", runtime.webview2_version)
+        return True
+    logger.error(
+        "Can't open the window: WebView2 %s, .NET Framework 4.6.2+ %s",
+        runtime.webview2_version or "missing",
+        "found" if runtime.dotnet_ok else "missing",
+    )
+    message, url = missing_runtime_help(runtime, APP_NAME)
+    if ask_yes_no(message):
+        import webbrowser
+
+        webbrowser.open(url)
+    return False
+
+
+def ask_yes_no(message: str) -> bool:
+    if sys.platform != "win32":  # pragma: no cover - the app targets Windows
+        sys.stderr.write(message + "\n")
+        return False
+    import ctypes
+
+    mb_yesno, mb_iconwarning, idyes = 0x4, 0x30, 6
+    answer = ctypes.windll.user32.MessageBoxW(None, message, APP_NAME, mb_yesno | mb_iconwarning)
+    return bool(answer == idyes)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    ensure_stdio()
     args = parse_args(argv)
+    if args.uninstall_cleanup:
+        return cleanup_from_installer()
     paths = AppPaths.resolve()
     try:
         paths.ensure()
@@ -376,6 +469,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not bring_existing_window_to_front(APP_NAME):
                 show_fatal_message(f"{APP_NAME} is already running.")
             return 0
+        if not check_webview_runtime():
+            return 1
         try:
             return run_window(args, paths)
         except Exception as exc:  # noqa: BLE001 - last resort: explain instead of vanishing

@@ -29,7 +29,8 @@ export type ErrorCode =
   | "schema_blocked"
   | "invalid_request"
   | "invalid_preference"
-  | "export_failed";
+  | "export_failed"
+  | "policy_notice";
 
 export type AuthKind = "oauth" | "internal" | "pat";
 export type PastedKind = "internal" | "pat";
@@ -535,7 +536,26 @@ export interface AppInfo {
   database_path: string;
   log_dir: string;
   schema_version: number;
+  /** The privacy policy version this build was made for (PLAN.md 13). */
+  policy_version: number | null;
   started_at: string;
+}
+
+/** One version's plain-language summary of privacy policy changes. */
+export interface PolicyChange {
+  version: number;
+  /** YYYY-MM-DD */
+  date: string;
+  summary: string[];
+}
+
+/** Privacy policy changes to show before anything else (PLAN.md 13). Bundled with the build. */
+export interface PolicyNotice {
+  version: number;
+  acknowledged_version: number;
+  url: string;
+  /** Every change since the acknowledged version, oldest first. */
+  changes: PolicyChange[];
 }
 
 export interface BridgeCheckStarted {
@@ -561,6 +581,8 @@ export interface PythonApi {
   open_log_folder(): Promise<BridgeResponse<null>>;
   raise_test_error(where: TestErrorLocation): Promise<BridgeResponse<null>>;
   quit(): Promise<BridgeResponse<null>>;
+  get_policy_notice(): Promise<BridgeResponse<PolicyNotice | null>>;
+  acknowledge_policy(version: number): Promise<BridgeResponse<null>>;
   get_connection(): Promise<BridgeResponse<ConnectionInfo>>;
   connect_with_token(kind: PastedKind, token: string): Promise<BridgeResponse<ConnectionInfo>>;
   start_sign_in(): Promise<BridgeResponse<{ port: number; reopened: boolean }>>;

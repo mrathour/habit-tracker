@@ -106,6 +106,44 @@ The version is pinned in three places that must agree:
 
 When you raise the minimum, change `.node-version` and `engines` together. Dependabot doesn't update `.node-version`.
 
+## Building the installer
+
+`packaging\build.ps1` builds `Setup.exe` (PLAN.md 13). From the repository root, in PowerShell:
+
+```powershell
+uv sync --group build            # once: adds PyInstaller (the "build" dependency group)
+.\packaging\build.ps1            # UI, then the app (PyInstaller), then the installer (Inno Setup)
+```
+
+It writes `build\installer\HabitTracker-Setup-<version>.exe` and a `.sha256` file next to it. On the way it:
+
+1. Builds the UI (`-SkipUi` reuses `ui\dist`).
+2. Builds `build\pyinstaller\dist\HabitTracker\` with `packaging\habit_tracker.spec`: one folder, windowed, with the icon and version details.
+3. Runs the built `HabitTracker.exe --self-check` in a throwaway data folder, and stops unless it is frozen, has the right version and policy version, uses Windows Credential Manager, and finds the UI and the migrations.
+4. Downloads Microsoft's WebView2 bootstrapper once into `build\webview2\` and checks it is signed by Microsoft.
+5. Compiles `packaging\HabitTracker.iss` with Inno Setup (`iscc`, from Scoop).
+
+Other options:
+
+- **Newer-policy test build:** `.\packaging\build.ps1 -PolicyFile packaging\test-policy.json -Suffix policytest` bundles policy version 2 and writes `HabitTracker-Setup-<version>-policytest.exe`, in separate build folders.
+- **App icon:** `packaging\icon\app-icon.svg` is the source. After changing it, run `uv run python packaging\icon\make_icon.py`, which draws every size with headless Edge and writes `app-icon.ico`, `app-icon.png` and the website's `service\pages\icon.png`. Commit all of them, and keep `ui\src\components\BrandMark.tsx` in step.
+- **Installer test:** `packaging\test-installer.ps1 -Setup <Setup.exe>` installs, upgrades and uninstalls (both ways) and checks each step. **It deletes `%APPDATA%\HabitTracker` and the saved Notion sign-in**, so it runs in CI only (the `installer` job) and refuses on a PC that has Habit Tracker data.
+
+CI's `installer` job runs the build and the installer test on every pull request and keeps `Setup.exe` as a downloadable artifact for 14 days. It installs Inno Setup 6.7.3 with a hash check (`packaging\install-inno-setup.ps1`); keep that version in step with this machine's.
+
+## Releasing
+
+1. On `main`, make sure `version` in `pyproject.toml` is the new version (run `uv lock` after changing it) and `CHANGELOG.md` has a `## [X.Y.Z] - YYYY-MM-DD` entry. Both go through a pull request like any change.
+2. Tag and push:
+
+   ```powershell
+   git checkout main; git pull
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+3. The `Release` workflow refuses a tag that doesn't match `pyproject.toml`, isn't on `main`, or has no changelog entry. Otherwise it runs the tests, builds and tests the installer, and publishes a GitHub Release with `Setup.exe`, its `.sha256` and the changelog entry as notes. 0.x versions are marked as pre-releases.
+
 ## Notion data for testing
 
 Both databases have the columns ID, Name, Start Time, End Time, MinuteSpent and Parent Task.
