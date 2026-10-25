@@ -132,7 +132,8 @@ try {
 
     $Setup = Join-Path $InstallerDir "$Name.exe"
     $Hash = (Get-FileHash $Setup -Algorithm SHA256).Hash.ToLower()
-    "$Hash  $Name.exe" | Set-Content -Encoding ascii "$Setup.sha256"
+    # One LF-terminated line, so `sha256sum -c` works as well as Get-FileHash.
+    [System.IO.File]::WriteAllText("$Setup.sha256", "$Hash  $Name.exe`n", [System.Text.Encoding]::ASCII)
     Step "Done"
     Write-Host "$Setup"
     Write-Host ("{0:N1} MB, SHA-256 {1}" -f ((Get-Item $Setup).Length / 1MB), $Hash)
