@@ -28,6 +28,10 @@ updates:
       # Remove this once it supports TypeScript 7.
       - dependency-name: typescript
         versions: [">=6.1.0"]
+      # Node's type definitions follow the Node.js runtime in .node-version (24 LTS); raise both
+      # together when the project moves to a newer LTS (PLAN.md Decisions log, 2026-10-25).
+      - dependency-name: "@types/node"
+        versions: [">=25"]
 
   - package-ecosystem: npm
     directory: /service
