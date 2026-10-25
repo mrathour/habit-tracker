@@ -78,6 +78,8 @@ Step "1. Fresh install"
 Install (Join-Path $Logs "install.log")
 Check (Test-Path $Exe) "the app is in $AppDir"
 Check (Test-Path (Join-Path $AppDir "unins000.exe")) "the uninstaller is there"
+Check (Test-Path (Join-Path $AppDir "LICENSE.txt")) "the license is next to the app"
+Check ((Get-Content (Join-Path $AppDir "THIRD_PARTY_NOTICES.txt") -Raw) -match "pywebview") "the third-party notices are next to the app"
 Check (Test-Path $StartMenu) "the Start Menu shortcut exists"
 Check (Test-Path $Desktop) "the desktop shortcut exists"
 $Entry = Get-ItemProperty $UninstallKey

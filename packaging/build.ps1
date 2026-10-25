@@ -95,6 +95,14 @@ try {
     if ($Problems) { throw "The built app isn't right: $($Problems -join '; ')." }
     Remove-Item $CheckHome -Recurse -Force
 
+    Step "Writing the license and third-party notices"
+    $NoticesDir = Join-Path $PyiDir "notices"
+    New-Item -ItemType Directory -Force $NoticesDir | Out-Null
+    Copy-Item (Join-Path $Root "LICENSE") (Join-Path $NoticesDir "LICENSE.txt")
+    Invoke-Checked "The third-party notices" {
+        uv run --group build python packaging\third_party_notices.py (Join-Path $NoticesDir "THIRD_PARTY_NOTICES.txt")
+    }
+
     Step "Getting Microsoft's WebView2 bootstrapper"
     $Bootstrapper = Join-Path $BuildDir "webview2\MicrosoftEdgeWebview2Setup.exe"
     if (-not (Test-Path $Bootstrapper)) {
@@ -118,7 +126,7 @@ try {
     if (-not $Iscc) { throw "Inno Setup 6 (ISCC.exe) wasn't found. Install it: scoop install extras/inno-setup" }
     New-Item -ItemType Directory -Force $InstallerDir | Out-Null
     Invoke-Checked "Inno Setup" {
-        & $Iscc /Qp "/DAppVersion=$Version" "/DSourceDir=$AppDir" "/DWebView2Bootstrapper=$Bootstrapper" `
+        & $Iscc /Qp "/DAppVersion=$Version" "/DSourceDir=$AppDir" "/DWebView2Bootstrapper=$Bootstrapper" "/DNoticesDir=$NoticesDir" `
             "/DOutputDir=$InstallerDir" "/DOutputName=$Name" packaging\HabitTracker.iss
     }
 

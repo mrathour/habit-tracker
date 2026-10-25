@@ -9,6 +9,9 @@ The first test release for Windows 10 and 11.
 
 ### Added
 
+- The MIT License, and `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` (the licenses of the bundled
+  Python runtime, Python packages and UI packages) installed next to the app.
+
 - **Connect to Notion** with Notion sign-in, or by pasting an internal integration token or a personal access token. The app only ever reads from Notion.
 - **Choose your work log** and map its columns, with sample values and automatic matching.
 - **Sync** your entries to this computer: a quick sync on every launch, a full sync when needed, and checks that flag entries with missing times, an end before the start, or minutes that don't match.

@@ -429,6 +429,7 @@ The user chooses which kind they are pasting:
 ## 13. Windows packaging
 
 - **Build:** PyInstaller in one-folder mode, which starts faster than one-file builds (`packaging/habit_tracker.spec`). It is a windowed app with the app icon and Windows version details, and bundles `ui/dist`, the SQL migrations and the package's version metadata. `packaging/build.ps1` builds the UI, then the app, then the installer. Every build must pass `--self-check` from the built `.exe`.
+- **Licenses:** Habit Tracker is MIT-licensed. Every build writes `THIRD_PARTY_NOTICES.txt` (`packaging/third_party_notices.py`) with the license texts of the Python runtime, PyInstaller's bootloader, every runtime Python package and every production npm package in the UI bundle; it refuses to build if a package has neither a license text nor a declared license. The installer puts it and `LICENSE.txt` next to the app, and the installer test checks both are there.
 - **Version:** one source, `version` in `pyproject.toml`. The app, the installer and the release read it from there, and the release workflow refuses a tag that doesn't match. `v0.1.0` is the first test release; `v1.0.0` is reserved for the first public release.
 - **Installer:** Inno Setup creates `Setup.exe` with a Start Menu shortcut, a desktop shortcut (a checkbox, on by default) and an uninstaller.
   - **Per user:** it installs to `%LOCALAPPDATA%\Programs\Habit Tracker` without administrator rights.
@@ -527,7 +528,7 @@ Each phase ends with something the user can run and check. Every phase after Pha
 **Decisions to settle first.** Claude Code asks the user about each:
 - **Project and repository name.** Settled: `habit-tracker`.
 - **Repository visibility.** Settled: private until the first public release.
-- **License.** Needed before the repository or app is shared publicly. Still undecided, so it stays in Open items.
+- **License.** Settled: MIT (Decisions log, 2026-10-25).
 - **Project folder location** on this computer. Settled: `C:\Users\LENOVO\Documents\JS\habit-tracker`, with Claude Code run from PowerShell.
 
 **Accounts and access.** These steps need the user:
@@ -593,7 +594,6 @@ Phase 0 is the only phase committed directly to `main`.
 
 ## 16. Open items
 
-- License: undecided. It must be chosen before the repository or app is shared publicly.
 - Cloudflare account: the user creates it when Phase 3 reaches the token service. Claude Code gives exact steps at that point.
 - Notion review for other workspaces: sign-in without review is verified live only in the author's own workspace (2026-10-20). Phase 3 check (d) (a second Notion account) was accepted by the user's decision without being verified (2026-10-22). If another workspace's sign-in is ever blocked pending review, find out what Notion's review requires, record it here and in the Decisions log, and submit the connection.
 - Chrome extension path: `C:\Users\LENOVO\Documents\JS\myNotionNotes`
@@ -700,3 +700,4 @@ Phase 0 is the only phase committed directly to `main`.
 | 2026-10-22 | Phase 8 WebView2: the app checks for the runtime before opening its window and always asks pywebview for Edge WebView2, because pywebview otherwise falls back silently to Internet Explorer's engine, which can't run the interface (10). |
 | 2026-10-24 | Issue #11: a `HABIT_TRACKER_HOME` copy stores its sign-in under its own service, `HabitTracker-<hash>`, instead of the account `notion-<hash>` of the real service. keyring's Windows backend names an entry after the service alone, so the old scheme put a copy's sign-in on the real `HabitTracker` target and moved the real entry to `notion@HabitTracker`. A copy moves an entry saved under the old scheme the first time it reads it, and deletes it on logout. The real app's entry is unchanged and still read wherever keyring moved it (12.5). |
 | 2026-10-24 | Issue #12: Notion leaves a relation out of the schema while its linked database isn't shared with the connection, so "Parent Task" couldn't be mapped. The mapping screen now explains how to share the linked database, with Check again; a column that appears after the mapping was saved and fits an unused optional field is offered on Home and in Settings (Review column mapping or Dismiss), and preselected as "New column" on the mapping screen. The mapping records `known_columns` and the sync stores `mapping_suggestions` (4.2, 11). The day detail now also opens each session's parent task and other linked pages (7). |
+| 2026-10-25 | License: **MIT**, chosen by Claude Code at the user's request. It is the simplest permissive license and compatible with everything the app bundles (MIT, BSD, Apache-2.0, PSF, MPL-2.0, 0BSD; PyInstaller's bootloader exception allows any license). `LICENSE` is in the repository, and `pyproject.toml`, `ui/package.json` and `service/package.json` declare it. Because those licenses require their texts to travel with copies, `packaging/build.ps1` writes `THIRD_PARTY_NOTICES.txt` (`packaging/third_party_notices.py`: the Python runtime, the bootloader, every runtime Python package and every production npm package in the UI bundle) and the installer puts it, with `LICENSE.txt`, next to the app (13). |
