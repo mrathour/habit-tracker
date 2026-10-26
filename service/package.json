@@ -19,7 +19,7 @@
     "types": "wrangler types --strict-vars=false --check"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.6",
+    "@cloudflare/vitest-plugin": "^1.4.7",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
